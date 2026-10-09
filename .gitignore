@@ -4,7 +4,6 @@ test/build/
 managed_components/
 sdkconfig
 sdkconfig.old
-dependencies.lock
 .audit/
 decisions.tsv
 __pycache__/
