@@ -270,7 +270,7 @@ static void update_clock(const ui_model_t *m)
     lv_scale_set_line_needle_value(ui.clock_scale, ui.clock_hour, 80, h * 5 + mi / 12);
     lv_scale_set_line_needle_value(ui.clock_scale, ui.clock_min, 120, mi);
     lv_scale_set_line_needle_value(ui.clock_scale, ui.clock_sec, 130, s);
-    char buf[96];
+    char buf[128];
     ms_format_hhmm((uint16_t)(sec / 60), buf, sizeof(buf));
     set_text(ui.clock_digital, buf);
     char date[64], hijri[48];

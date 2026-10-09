@@ -14,3 +14,6 @@ add_executable(core_tests test_main.c ${UNITY_DIR}/unity.c)
 target_include_directories(core_tests PRIVATE ${UNITY_DIR})
 target_compile_definitions(core_tests PRIVATE FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/../fixtures")
 target_link_libraries(core_tests core)
+
+add_executable(mkcache mkcache.c)
+target_link_libraries(mkcache core)

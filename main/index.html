@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Waktu Solat</title>
+<style>
+:root{--bg:#0b0b0c;--card:#17171a;--text:#f2f2f2;--muted:#9a9aa0;--accent:#f5b942;--bad:#ff6b6b}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.45 system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text)}
+main{max-width:560px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0 2px}
+h2{font-size:17px;margin:0 0 10px}
+.muted{color:var(--muted);font-size:14px}
+section{background:var(--card);border-radius:14px;padding:16px;margin:14px 0}
+table{width:100%;border-collapse:collapse}
+td{padding:7px 4px;border-bottom:1px solid #26262a}
+td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+tr.now td{color:var(--accent);font-weight:600}
+label{display:block;margin:10px 0 4px}
+input,select,button{font:inherit;border-radius:10px;border:1px solid #333;background:#0f0f11;color:var(--text);padding:10px;width:100%}
+input[type=checkbox]{width:auto;margin-right:8px}
+input[type=range]{padding:0}
+button{background:var(--accent);color:#111;border:0;font-weight:600;margin-top:10px;cursor:pointer}
+button.second{background:#2a2a2e;color:var(--text)}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.msg{margin-top:8px;font-size:14px}
+.err{color:var(--bad)}
+.badge{background:var(--accent);color:#111;border-radius:8px;padding:1px 8px;font-size:12px}
+</style>
+</head>
+<body>
+<main>
+<h1>Waktu Solat</h1>
+<div class="muted" id="status">Memuatkan...</div>
+
+<section id="times-card">
+<h2 id="today-title">Hari ini</h2>
+<div class="muted" id="hijri"></div>
+<table id="times"></table>
+<div class="msg" id="next"></div>
+</section>
+
+<section id="wifi-card">
+<h2>Wi-Fi</h2>
+<button class="second" onclick="scan()">Cari rangkaian</button>
+<label for="ssid">Nama rangkaian</label>
+<input id="ssid" list="ssids" autocomplete="off">
+<datalist id="ssids"></datalist>
+<label for="pass">Kata laluan</label>
+<input id="pass" type="password">
+<button onclick="saveWifi()">Simpan dan sambung</button>
+<div class="msg" id="wifi-msg"></div>
+</section>
+
+<section>
+<h2>Tetapan</h2>
+<label for="pin">PIN peranti (lihat skrin Tetapan pada peranti)</label>
+<input id="pin" inputmode="numeric" autocomplete="off">
+<label for="zone">Zon JAKIM</label>
+<select id="zone"></select>
+<label>Azan</label>
+<div id="adhan"></div>
+<label for="volume">Kelantangan <span id="volume-v"></span></label>
+<input id="volume" type="range" min="0" max="100">
+<label for="brightness">Kecerahan <span id="brightness-v"></span></label>
+<input id="brightness" type="range" min="5" max="100">
+<label><input id="night_dim" type="checkbox">Malapkan skrin waktu malam</label>
+<label for="theme">Tema</label>
+<select id="theme"><option value="0">Gelap</option><option value="1">Hijau</option><option value="2">Biru</option><option value="3">Ungu</option></select>
+<button onclick="saveSettings()">Simpan tetapan</button>
+<div class="msg" id="settings-msg"></div>
+</section>
+
+<section>
+<h2>Audio azan</h2>
+<div class="row">
+<button class="second" onclick="post('/api/adhan/play')">Uji azan</button>
+<button class="second" onclick="post('/api/adhan/stop')">Henti</button>
+</div>
+<label for="mp3">Tukar fail azan (MP3, maksimum 3 MB)</label>
+<input id="mp3" type="file" accept="audio/mpeg,.mp3">
+<label><input id="mp3-subuh" type="checkbox">Untuk Subuh sahaja</label>
+<button onclick="upload()">Muat naik</button>
+<div class="msg" id="mp3-msg"></div>
+</section>
+
+<section>
+<h2>Mawaqit (pilihan)</h2>
+<div class="muted">Hanya jika anda mempunyai token API Mawaqit. Jika gagal, peranti kembali kepada e-Solat JAKIM.</div>
+<label><input id="use-mawaqit" type="checkbox">Guna waktu masjid dari Mawaqit</label>
+<label for="token">Token API</label>
+<input id="token" type="password" placeholder="(tidak berubah jika kosong)">
+<label for="uuid">ID masjid</label>
+<input id="uuid">
+<button class="second" onclick="saveMawaqit()">Simpan Mawaqit</button>
+<div class="msg" id="mawaqit-msg"></div>
+</section>
+
+<section>
+<h2>Peranti</h2>
+<div class="muted" id="device"></div>
+<label for="fw">Kemas kini perisian (.bin)</label>
+<input id="fw" type="file" accept=".bin">
+<button class="second" onclick="ota()">Kemas kini</button>
+<div class="row">
+<button class="second" onclick="post('/api/rotate').then(()=>say('dev-msg','Memutar skrin dan memulakan semula...'))">Putar skrin 180°</button>
+<button class="second" onclick="post('/api/reboot').then(()=>say('dev-msg','Memulakan semula...'))">Mulakan semula</button>
+</div>
+<div class="msg" id="dev-msg"></div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const PRAYERS=['Subuh','Zohor','Asar','Maghrib','Isyak'];
+let settings={};
+try{$('pin').value=localStorage.getItem('pin')||''}catch(e){}
+function say(id,text,bad){const e=$(id);e.textContent=text;e.className='msg'+(bad?' err':'')}
+function headers(){try{localStorage.setItem('pin',$('pin').value)}catch(e){}return{'Content-Type':'application/json','X-PIN':$('pin').value}}
+async function req(url,opts){const r=await fetch(url,opts);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('Ralat '+r.status));return j}
+function post(url,body){return req(url,{method:'POST',headers:headers(),body:body?JSON.stringify(body):''}).catch(e=>alert(e.message))}
+function fmt(s){if(s<0)return'';const h=Math.floor(s/3600),m=Math.ceil(s%3600/60);return(h?h+' jam ':'')+m+' minit'}
+async function loadStatus(){
+  try{
+    const s=await req('/api/status');
+    $('status').textContent=s.place+' · '+(s.time_valid?s.now:'masa belum diselaraskan')+(s.stale?' · data lama':'');
+    $('device').textContent='Alamat '+s.ip+' · versi '+s.version+(s.battery!==undefined?' · bateri '+s.battery+'%':'');
+    $('next').textContent=s.next?s.next+' dalam '+fmt(s.seconds_to_next):'';
+    $('wifi-card').style.display=s.net==='setup'?'':'none';
+    if(s.net==='setup')$('times-card').style.display='none';
+  }catch(e){$('status').textContent='Tidak dapat menghubungi peranti'}
+}
+async function loadTimes(){
+  try{
+    const days=await req('/api/times');const d=days[0];if(!d)return;
+    $('today-title').innerHTML=d.date_ms+(d.origin==='anggaran'?' <span class="badge">Anggaran</span>':'');
+    $('hijri').textContent=d.hijri;
+    $('times').innerHTML=Object.entries(d.times).map(([k,v])=>'<tr><td>'+k+'</td><td>'+v+'</td></tr>').join('');
+  }catch(e){}
+}
+async function loadSettings(){
+  const [s,zones]=await Promise.all([req('/api/settings'),req('/api/zones')]);settings=s;
+  $('zone').innerHTML=zones.map(z=>'<option value="'+z.code+'">'+z.code+' · '+z.state+' · '+z.name+'</option>').join('');
+  $('zone').value=s.zone;
+  $('adhan').innerHTML=PRAYERS.map(p=>'<label><input type="checkbox" data-p="'+p+'"'+(s.adhan[p]?' checked':'')+'>'+p+'</label>').join('');
+  for(const k of['volume','brightness']){$(k).value=s[k];$(k+'-v').textContent=s[k];$(k).oninput=()=>$(k+'-v').textContent=$(k).value}
+  $('night_dim').checked=s.night_dim;$('theme').value=s.theme;
+  $('use-mawaqit').checked=s.source==='mawaqit';$('uuid').value=s.mawaqit_uuid;
+  $('token').placeholder=s.mawaqit_token_set?'(token disimpan; kosongkan untuk kekal)':'';
+}
+async function saveSettings(){
+  const adhan={};document.querySelectorAll('#adhan input').forEach(i=>adhan[i.dataset.p]=i.checked);
+  try{await req('/api/settings',{method:'POST',headers:headers(),body:JSON.stringify({zone:$('zone').value,adhan,volume:+$('volume').value,brightness:+$('brightness').value,night_dim:$('night_dim').checked,theme:+$('theme').value})});say('settings-msg','Disimpan.');loadStatus();loadTimes()}
+  catch(e){say('settings-msg',e.message,true)}
+}
+async function saveMawaqit(){
+  const b={source:$('use-mawaqit').checked?'mawaqit':'esolat',mawaqit_uuid:$('uuid').value.trim()};
+  if($('token').value)b.mawaqit_token=$('token').value.trim();
+  try{await req('/api/settings',{method:'POST',headers:headers(),body:JSON.stringify(b)});say('mawaqit-msg','Disimpan.');$('token').value=''}
+  catch(e){say('mawaqit-msg',e.message,true)}
+}
+async function scan(){
+  say('wifi-msg','Mencari...');
+  try{const l=await req('/api/scan');$('ssids').innerHTML=l.map(n=>'<option value="'+n.ssid.replace(/"/g,'&quot;')+'">').join('');say('wifi-msg',l.length+' rangkaian dijumpai. Pilih dalam ruang nama.')}
+  catch(e){say('wifi-msg',e.message,true)}
+}
+async function saveWifi(){
+  try{await req('/api/wifi',{method:'POST',headers:headers(),body:JSON.stringify({ssid:$('ssid').value,password:$('pass').value})});say('wifi-msg','Disimpan. Peranti dimulakan semula dan akan menyambung ke '+$('ssid').value+'.')}
+  catch(e){say('wifi-msg',e.message,true)}
+}
+async function sendFile(url,file,msgId){
+  try{const r=await fetch(url,{method:'POST',headers:{'X-PIN':$('pin').value},body:file});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('Ralat '+r.status));return true}
+  catch(e){say(msgId,e.message,true);return false}
+}
+async function upload(){
+  const f=$('mp3').files[0];if(!f)return say('mp3-msg','Pilih fail MP3 dahulu.',true);
+  say('mp3-msg','Memuat naik...');
+  if(await sendFile('/api/upload?file='+($('mp3-subuh').checked?'subuh':'adhan'),f,'mp3-msg'))say('mp3-msg','Fail azan disimpan.');
+}
+async function ota(){
+  const f=$('fw').files[0];if(!f)return say('dev-msg','Pilih fail .bin dahulu.',true);
+  say('dev-msg','Memuat naik perisian...');
+  if(await sendFile('/api/ota',f,'dev-msg'))say('dev-msg','Berjaya. Peranti dimulakan semula.');
+}
+loadStatus();loadTimes();loadSettings();setInterval(loadStatus,15000);
+</script>
+</body>
+</html>

@@ -1,3 +1,6 @@
 dependencies:
   idf: ">=5.5"
   waveshare/esp32_s3_touch_amoled_2_16: "^2.0.1"
+  chmorgan/esp-audio-player: "^1.0.7"
+  espressif/button: "^4"
+  espressif/mdns: "^1"
