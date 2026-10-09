@@ -300,8 +300,14 @@ static void test_malay_formatting(void)
     TEST_ASSERT_EQUAL_STRING("27 Rabiulakhir 1448H", buf);
     ms_format_hijri((date_t){0}, buf, sizeof(buf));
     TEST_ASSERT_EQUAL_STRING("", buf);
-    ms_format_hhmm(HM(5, 2), buf, sizeof(buf));
-    TEST_ASSERT_EQUAL_STRING("05:02", buf);
+    ms_format_time(HM(5, 2), buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_STRING("5:02 AM", buf);
+    ms_format_time(HM(13, 4), buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_STRING("1:04 PM", buf);
+    ms_format_time(HM(12, 0), buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_STRING("12:00 PM", buf);
+    ms_format_time(HM(0, 30), buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_STRING("12:30 AM", buf);
     ms_format_countdown(2 * 3600 + 14 * 60, buf, sizeof(buf));
     TEST_ASSERT_EQUAL_STRING("2 jam 14 minit", buf);
     ms_format_countdown(13 * 60 + 1, buf, sizeof(buf));

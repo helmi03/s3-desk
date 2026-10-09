@@ -84,15 +84,27 @@ def boot(b):
     return out
 
 
+def read_dump(b):
+    """The USB serial link occasionally drops a line of a 600 KB dump; retry."""
+    for _ in range(3):
+        out = b.cmd("snap", 25, r"SNAP END")
+        m = re.search(r"SNAP (\d+) (\d+) (\d+)\r?\n(.*?)SNAP END", out, re.S)
+        if m:
+            w, h, stride = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            try:
+                raw = b"".join(base64.b64decode(line, validate=True) for line in m.group(4).split())
+            except ValueError:
+                continue
+            if len(raw) == stride * h:
+                return w, h, stride, raw
+    return None
+
+
 def snapshot(b, path):
-    out = b.cmd("snap", 25, r"SNAP END")
-    m = re.search(r"SNAP (\d+) (\d+) (\d+)\r?\n(.*?)SNAP END", out, re.S)
-    if not check(m is not None, "screen dump received"):
+    dump = read_dump(b)
+    if not check(dump is not None, "complete screen dump received"):
         return
-    w, h, stride = int(m.group(1)), int(m.group(2)), int(m.group(3))
-    raw = base64.b64decode("".join(m.group(4).split()))
-    if not check(len(raw) == stride * h, "screen dump is complete", f"{len(raw)} of {stride * h} bytes"):
-        return
+    w, h, stride, raw = dump
     from PIL import Image
 
     img = Image.new("RGB", (w, h))

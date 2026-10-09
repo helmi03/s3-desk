@@ -47,9 +47,11 @@ size_t ms_format_hijri(date_t h, char *buf, size_t cap)
     return clamp(snprintf(buf, cap, "%d %s %dH", h.day, ms_hijri_month(h.month), h.year), cap);
 }
 
-size_t ms_format_hhmm(uint16_t minute, char *buf, size_t cap)
+size_t ms_format_time(uint16_t minute, char *buf, size_t cap)
 {
-    return clamp(snprintf(buf, cap, "%02u:%02u", minute / 60u, minute % 60u), cap);
+    unsigned h = (minute / 60u) % 24u;
+    unsigned h12 = h % 12u ? h % 12u : 12u;
+    return clamp(snprintf(buf, cap, "%u:%02u %s", h12, minute % 60u, h < 12u ? "AM" : "PM"), cap);
 }
 
 size_t ms_format_countdown(int32_t seconds, char *buf, size_t cap)

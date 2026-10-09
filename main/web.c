@@ -100,7 +100,7 @@ static void add_day(cJSON *arr, const day_times_t *d)
     cJSON_AddStringToObject(o, "origin", d->origin == ORIGIN_ESTIMATED ? "anggaran" : d->origin == ORIGIN_MAWAQIT ? "mawaqit" : "rasmi");
     cJSON *t = cJSON_AddObjectToObject(o, "times");
     for (int p = 0; p < P_COUNT; p++) {
-        ms_format_hhmm(d->minute[p], buf, sizeof(buf));
+        ms_format_time(d->minute[p], buf, sizeof(buf));
         cJSON_AddStringToObject(t, PRAYERS[p].name, buf);
     }
     cJSON_AddItemToArray(arr, o);

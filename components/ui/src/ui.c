@@ -159,8 +159,8 @@ static void build_list(lv_obj_t *p)
 
 static void footer_text(const ui_model_t *m, char *buf, size_t cap)
 {
-    char hm[8];
-    ms_format_hhmm((uint16_t)(m->now.second / 60), hm, sizeof(hm));
+    char hm[12];
+    ms_format_time((uint16_t)(m->now.second / 60), hm, sizeof(hm));
     const char *net = m->net == UI_NET_ONLINE ? "" : m->net == UI_NET_CONNECTING ? "  Wi-Fi..." : "  Luar talian";
     char bat[24] = "";
     if (m->battery_present) {
@@ -197,7 +197,7 @@ static void update_list(const ui_model_t *m)
     for (int i = 0; i < P_COUNT; i++) {
         prayer_t p = LIST_ORDER[i];
         bool current = p == m->sched.current;
-        ms_format_hhmm(m->today.minute[p], buf, sizeof(buf));
+        ms_format_time(m->today.minute[p], buf, sizeof(buf));
         set_text(ui.list_times[i], buf);
         lv_obj_set_style_bg_opa(ui.list_rows[i], current ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
         uint32_t fg = current ? c->on_accent : (PRAYERS[p].adhan ? c->text : c->muted);
@@ -271,7 +271,7 @@ static void update_clock(const ui_model_t *m)
     lv_scale_set_line_needle_value(ui.clock_scale, ui.clock_min, 120, mi);
     lv_scale_set_line_needle_value(ui.clock_scale, ui.clock_sec, 130, s);
     char buf[128];
-    ms_format_hhmm((uint16_t)(sec / 60), buf, sizeof(buf));
+    ms_format_time((uint16_t)(sec / 60), buf, sizeof(buf));
     set_text(ui.clock_digital, buf);
     char date[64], hijri[48];
     ms_format_date(m->now.date, date, sizeof(date));
@@ -314,7 +314,7 @@ static void update_countdown(const ui_model_t *m)
         snprintf(buf, sizeof(buf), "%02ld:%02ld:%02ld", (long)(t / 3600), (long)(t / 60 % 60), (long)(t % 60));
         set_text(ui.cd_remaining, buf);
         uint16_t at = (uint16_t)(((m->now.second + t) / 60) % (24 * 60));
-        ms_format_hhmm(at, buf, sizeof(buf));
+        ms_format_time(at, buf, sizeof(buf));
         set_text(ui.cd_time, buf);
     } else {
         set_text(ui.cd_remaining, "--:--:--");
@@ -355,7 +355,7 @@ static void update_adhan(const ui_model_t *m)
 {
     char buf[16];
     set_text(ui.adhan_name, PRAYERS[m->adhan_prayer].name);
-    ms_format_hhmm(m->today.minute[m->adhan_prayer], buf, sizeof(buf));
+    ms_format_time(m->today.minute[m->adhan_prayer], buf, sizeof(buf));
     set_text(ui.adhan_time, m->have_today ? buf : "");
 }
 
