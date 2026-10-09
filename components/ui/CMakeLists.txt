@@ -1,0 +1,10 @@
+file(GLOB UI_FONTS fonts/*.c)
+set(UI_SRCS src/ui.c src/ui_model.c ${UI_FONTS})
+
+if(ESP_PLATFORM)
+    idf_component_register(SRCS ${UI_SRCS} INCLUDE_DIRS include REQUIRES core lvgl__lvgl)
+else()
+    add_library(ui STATIC ${UI_SRCS})
+    target_include_directories(ui PUBLIC include)
+    target_link_libraries(ui PUBLIC core lvgl)
+endif()

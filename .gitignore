@@ -8,3 +8,4 @@ dependencies.lock
 .audit/
 decisions.tsv
 __pycache__/
+sim/shots/
