@@ -86,6 +86,12 @@ static int cmd_key(int argc, char **argv)
     return 0;
 }
 
+static int cmd_hold(int argc, char **argv)
+{
+    app_button_hold();
+    return 0;
+}
+
 static int cmd_set(int argc, char **argv)
 {
     if (argc != 2) {
@@ -189,6 +195,7 @@ void console_start(void)
         {.command = "adhan", .help = "play the Adhan now (test)", .func = cmd_adhan},
         {.command = "stop", .help = "stop audio", .func = cmd_stop},
         {.command = "key", .help = "simulate a GPIO18 key press", .func = cmd_key},
+        {.command = "hold", .help = "simulate holding the GPIO18 key (toggles Tetapan)", .func = cmd_hold},
         {.command = "set", .help = "apply settings JSON", .func = cmd_set},
         {.command = "view", .help = "view 0|1|2|settings", .func = cmd_view},
         {.command = "snap", .help = "dump the screen as base64 RGB565", .func = cmd_snap},

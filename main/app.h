@@ -17,6 +17,7 @@ bool app_apply_settings(const settings_t *s, char *err, size_t err_cap);
 void app_stop_adhan(void);
 void app_test_adhan(void);
 void app_button_press(void);
+void app_button_hold(void);
 void app_power_short_press(void);
 void app_fake_prayer(int minutes_ahead);
 void app_set_stale(bool stale);

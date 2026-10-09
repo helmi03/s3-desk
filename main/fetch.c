@@ -180,5 +180,5 @@ void fetch_kick(void)
 
 void fetch_start(void)
 {
-    xTaskCreatePinnedToCore(fetch_task, "fetch", 8192, NULL, 3, &task, 0);
+    xTaskCreatePinnedToCore(fetch_task, "fetch", 12288, NULL, 3, &task, 0);
 }

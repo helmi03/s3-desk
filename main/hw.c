@@ -147,6 +147,12 @@ static void on_key(void *btn, void *ctx)
     app_button_press();
 }
 
+static void on_key_hold(void *btn, void *ctx)
+{
+    ESP_LOGI(TAG, "key GPIO18 hold");
+    app_button_hold();
+}
+
 static void poll_task(void *arg)
 {
     for (;;) {
@@ -163,11 +169,12 @@ void hw_init_sensors(void)
 
 void hw_start(void)
 {
-    button_config_t cfg = {0};
+    button_config_t cfg = {.long_press_time = 1000};
     button_gpio_config_t gpio = {.gpio_num = USER_KEY_GPIO, .active_level = 0};
     button_handle_t btn = NULL;
     if (iot_button_new_gpio_device(&cfg, &gpio, &btn) == ESP_OK) {
         iot_button_register_cb(btn, BUTTON_SINGLE_CLICK, NULL, on_key, NULL);
+        iot_button_register_cb(btn, BUTTON_LONG_PRESS_START, NULL, on_key_hold, NULL);
     } else {
         ESP_LOGW(TAG, "GPIO18 key init failed");
     }

@@ -91,6 +91,8 @@ def snapshot(b, path):
         return
     w, h, stride = int(m.group(1)), int(m.group(2)), int(m.group(3))
     raw = base64.b64decode("".join(m.group(4).split()))
+    if not check(len(raw) == stride * h, "screen dump is complete", f"{len(raw)} of {stride * h} bytes"):
+        return
     from PIL import Image
 
     img = Image.new("RGB", (w, h))

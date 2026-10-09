@@ -12,7 +12,7 @@
 
 static const char *TAG = "app";
 
-#define DIM_BRIGHTNESS 10
+#define DIM_BRIGHTNESS 30
 
 static SemaphoreHandle_t lock;
 
@@ -108,6 +108,22 @@ void app_button_press(void)
     }
     if (display_lock(500)) {
         ui_step_view(1);
+        display_unlock();
+    }
+}
+
+void app_button_hold(void)
+{
+    xSemaphoreTake(lock, portMAX_DELAY);
+    bool playing = st.adhan_playing;
+    st.screen_off = false;
+    xSemaphoreGive(lock);
+    if (playing) {
+        app_stop_adhan();
+        return;
+    }
+    if (display_lock(500)) {
+        ui_open_settings(ui_current_mode() != UI_MODE_SETTINGS);
         display_unlock();
     }
 }

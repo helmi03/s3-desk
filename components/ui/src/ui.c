@@ -641,7 +641,13 @@ static void update_settings_info(const ui_model_t *m)
 static void on_screen_event(lv_event_t *e)
 {
     lv_event_code_t code = lv_event_get_code(e);
-    if (ui.mode != UI_MODE_VIEW && !(ui.mode == UI_MODE_SETTINGS && code == LV_EVENT_LONG_PRESSED)) {
+    bool settings_reachable = ui.mode == UI_MODE_VIEW || ui.mode == UI_MODE_SETTINGS || ui.mode == UI_MODE_NO_DATA ||
+                              ui.mode == UI_MODE_WAITING_TIME;
+    if (code == LV_EVENT_LONG_PRESSED && settings_reachable) {
+        ui_open_settings(ui.mode != UI_MODE_SETTINGS);
+        return;
+    }
+    if (ui.mode != UI_MODE_VIEW) {
         return;
     }
     if (code == LV_EVENT_GESTURE) {
@@ -653,8 +659,6 @@ static void on_screen_event(lv_event_t *e)
         }
     } else if (code == LV_EVENT_SHORT_CLICKED) {
         ui_step_view(1);
-    } else if (code == LV_EVENT_LONG_PRESSED) {
-        ui_open_settings(ui.mode != UI_MODE_SETTINGS);
     }
 }
 
