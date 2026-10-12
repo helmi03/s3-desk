@@ -91,6 +91,7 @@ void hw_set_brightness(int percent);
  * tools/check.sh rejects bsp_display_lock in main/. */
 void display_start(quarter_t initial);
 void display_set_rotation(quarter_t q);
+extern volatile bool display_touch_log;
 bool display_lock(int timeout_ms);
 void display_unlock(void);
 

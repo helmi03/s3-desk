@@ -11,6 +11,42 @@
 static uint8_t draw_buf[W * H * 2];
 static int clipped;
 
+static lv_point_t finger;
+static bool finger_down;
+
+static void finger_read(lv_indev_t *indev, lv_indev_data_t *data)
+{
+    data->point = finger;
+    data->state = finger_down ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+}
+
+/* Drags a virtual finger from (x, y0) to (x, y1) in small steps, as a swipe. */
+static void swipe(int x, int y0, int y1)
+{
+    finger = (lv_point_t){x, y0};
+    finger_down = true;
+    for (int i = 0; i <= 20; i++) {
+        finger.y = y0 + (y1 - y0) * i / 20;
+        lv_tick_inc(16);
+        lv_timer_handler();
+    }
+    finger_down = false;
+    for (int i = 0; i < 60; i++) {
+        lv_tick_inc(16);
+        lv_timer_handler();
+    }
+}
+
+static int32_t max_scroll_y(lv_obj_t *obj)
+{
+    int32_t best = lv_obj_get_scroll_y(obj);
+    for (uint32_t i = 0; i < lv_obj_get_child_count(obj); i++) {
+        int32_t v = max_scroll_y(lv_obj_get_child(obj, (int32_t)i));
+        best = v > best ? v : best;
+    }
+    return best;
+}
+
 static void flush_cb(lv_display_t *d, const lv_area_t *a, uint8_t *px)
 {
     lv_display_flush_ready(d);
@@ -141,6 +177,9 @@ int main(int argc, char **argv)
     static const char *const THEME_FILE[THEME_COUNT] = {"gelap", "hijau", "biru", "ungu"};
     static const char *const VIEW_FILE[UI_VIEW_COUNT] = {"senarai", "jam", "kiraan"};
 
+    lv_indev_t *pointer = lv_indev_create();
+    lv_indev_set_type(pointer, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(pointer, finger_read);
     ui_init(NULL);
     char name[64];
     for (int t = 0; t < THEME_COUNT; t++) {
@@ -188,7 +227,15 @@ int main(int argc, char **argv)
     ui_update(&m);
     ui_open_settings(true);
     shot(dir, "tetapan");
+    swipe(240, 400, 120);
+    int32_t scrolled = max_scroll_y(lv_screen_active());
+    shot(dir, "tetapan-bawah");
     ui_open_settings(false);
+    if (scrolled < 100) {
+        fprintf(stderr, "FAIL settings did not scroll on swipe up (scroll_y %d)\n", (int)scrolled);
+        return 1;
+    }
+    printf("settings scrolls on swipe up (scroll_y %d)\n", (int)scrolled);
 
     if (clipped) {
         fprintf(stderr, "%d clipped or truncated labels\n", clipped);

@@ -15,7 +15,8 @@ static const char *TAG = "display";
 
 static esp_lcd_panel_io_handle_t panel_io;
 static volatile quarter_t quarter;
-static uint16_t *rot_buf; /* one flush in flight at a time, so one rotation buffer is enough */
+static uint16_t *rot_buf;
+volatile bool display_touch_log; /* one flush in flight at a time, so one rotation buffer is enough */
 
 bool display_lock(int timeout_ms)
 {
@@ -47,6 +48,9 @@ static void map_touch(esp_lcd_touch_handle_t tp, uint16_t *x, uint16_t *y, uint1
         ux = ux < 0 ? 0 : ux >= BSP_LCD_H_RES ? BSP_LCD_H_RES - 1 : ux;
         uy = uy < 0 ? 0 : uy >= BSP_LCD_V_RES ? BSP_LCD_V_RES - 1 : uy;
         orientation_map_touch(quarter, BSP_LCD_H_RES, ux, uy, &lx, &ly);
+        if (display_touch_log && i == 0) {
+            ESP_EARLY_LOGI(TAG, "touch raw %u,%u upright %d,%d lvgl %d,%d q%d", x[i], y[i], ux, uy, lx, ly, quarter);
+        }
         x[i] = (uint16_t)lx;
         y[i] = (uint16_t)ly;
     }

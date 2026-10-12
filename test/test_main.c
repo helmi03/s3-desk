@@ -426,6 +426,15 @@ static void apply_panel(quarter_t q, int m, int lx, int ly, int *px, int *py)
     *py = y;
 }
 
+/* Where a finger at panel-native point P shows up in the touch frame. With
+ * buttons on top (q = 3) a drag to the right decreased raw y and a drag up
+ * decreased raw x (board log 2026-10-12), so the frame is P turned by q = 3. */
+static void touch_frame(int px, int py, int *tx, int *ty)
+{
+    *tx = 479 - py;
+    *ty = px;
+}
+
 static void test_touch_lands_on_the_pixel_drawn_under_the_finger(void)
 {
     static const int POINTS[][2] = {{0, 0}, {479, 0}, {0, 479}, {120, 400}, {333, 17}};
@@ -433,14 +442,19 @@ static void test_touch_lands_on_the_pixel_drawn_under_the_finger(void)
         for (size_t i = 0; i < sizeof(POINTS) / sizeof(POINTS[0]); i++) {
             int px, py, lx, ly;
             apply_panel(q, 479, POINTS[i][0], POINTS[i][1], &px, &py);
-            orientation_map_touch(q, 480, px, py, &lx, &ly);
+            int tx, ty;
+            touch_frame(px, py, &tx, &ty);
+            orientation_map_touch(q, 480, tx, ty, &lx, &ly);
             TEST_ASSERT_EQUAL(POINTS[i][0], lx);
             TEST_ASSERT_EQUAL(POINTS[i][1], ly);
         }
     }
     int lx, ly;
-    orientation_map_touch(1, 480, 0, 0, &lx, &ly);
-    TEST_ASSERT_FALSE(lx == 0 && ly == 0);
+    /* buttons on top: a rightward drag (raw y 407 -> 213) must move LVGL x right */
+    orientation_map_touch(3, 480, 480 - 407, 303, &lx, &ly);
+    int x0 = lx;
+    orientation_map_touch(3, 480, 480 - 213, 289, &lx, &ly);
+    TEST_ASSERT_GREATER_THAN(x0 + 100, lx);
 }
 
 static void test_dates(void)

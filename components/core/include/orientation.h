@@ -27,8 +27,10 @@ bool orientation_update(orientation_t *o, accel_mg_t a, uint16_t dt_ms);
 /* The orientation a single reading points to, or false if it is ambiguous. */
 bool orientation_of(accel_mg_t a, quarter_t *out);
 
-/* Maps a touch point in upright panel coordinates to LVGL coordinates when
- * the panel is rotated by `q` (panel and touch share one transform). */
+/* Maps a touch point to LVGL coordinates when the display is turned by `q`.
+ * The input is in the touch frame, CST9217 raw (x, y) -> (480 - y, x) as the
+ * BSP flags give it. Measured on the board, that frame lines up with the
+ * display at q = 3 (buttons on top), not with the panel's native q = 0. */
 void orientation_map_touch(quarter_t q, int size, int ux, int uy, int *lx, int *ly);
 
 /* The CO5300 ignores the MADCTL row/column exchange bit, so the panel itself

@@ -108,6 +108,12 @@ static int cmd_imu(int argc, char **argv)
     return 0;
 }
 
+static int cmd_touchlog(int argc, char **argv)
+{
+    display_touch_log = argc > 1 && atoi(argv[1]);
+    return 0;
+}
+
 static int cmd_set(int argc, char **argv)
 {
     if (argc != 2) {
@@ -213,6 +219,7 @@ void console_start(void)
         {.command = "key", .help = "simulate a GPIO18 key press", .func = cmd_key},
         {.command = "hold", .help = "simulate holding the GPIO18 key (toggles Tetapan)", .func = cmd_hold},
         {.command = "imu", .help = "imu [N]: print accelerometer and gyro N times", .func = cmd_imu},
+        {.command = "touchlog", .help = "touchlog 1|0: log touch coordinates", .func = cmd_touchlog},
         {.command = "set", .help = "apply settings JSON", .func = cmd_set},
         {.command = "view", .help = "view 0|1|2|settings", .func = cmd_view},
         {.command = "snap", .help = "dump the screen as base64 RGB565", .func = cmd_snap},

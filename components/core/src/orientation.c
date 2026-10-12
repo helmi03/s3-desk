@@ -52,7 +52,9 @@ bool orientation_update(orientation_t *o, accel_mg_t a, uint16_t dt_ms)
 
 /* Physical position P of LVGL pixel L: software 90 degrees for odd quarters,
  * then the panel's mirror (0xC0 = both axes). Touch reports P; LVGL needs L. */
-void orientation_map_touch(quarter_t q, int size, int ux, int uy, int *lx, int *ly)
+#define TOUCH_FRAME_QUARTER 3
+
+static void unrotate(quarter_t q, int size, int ux, int uy, int *lx, int *ly)
 {
     int m = size - 1;
     switch (q & 3) {
@@ -73,6 +75,11 @@ void orientation_map_touch(quarter_t q, int size, int ux, int uy, int *lx, int *
         *ly = uy;
         break;
     }
+}
+
+void orientation_map_touch(quarter_t q, int size, int ux, int uy, int *lx, int *ly)
+{
+    unrotate((quarter_t)(q - TOUCH_FRAME_QUARTER), size, ux, uy, lx, ly);
 }
 
 uint8_t orientation_madctl(quarter_t q)
