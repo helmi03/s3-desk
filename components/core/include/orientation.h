@@ -31,5 +31,9 @@ bool orientation_of(accel_mg_t a, quarter_t *out);
  * the panel is rotated by `q` (panel and touch share one transform). */
 void orientation_map_touch(quarter_t q, int size, int ux, int uy, int *lx, int *ly);
 
-/* MADCTL value the CO5300 needs for `q`. */
+/* The CO5300 ignores the MADCTL row/column exchange bit, so the panel itself
+ * can only mirror (0 and 180 degrees). Sideways orientations also rotate each
+ * flushed chunk 90 degrees clockwise in software: LVGL pixel L goes to
+ * (size - 1 - L.y, L.x), then the panel applies this MADCTL. */
 uint8_t orientation_madctl(quarter_t q);
+bool orientation_software_rotate(quarter_t q);

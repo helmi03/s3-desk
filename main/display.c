@@ -1,19 +1,21 @@
 #include "app.h"
 #include "bsp/esp-bsp.h"
 #include "bsp/touch.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_lv_adapter.h"
 #include "orientation.h"
 
 static const char *TAG = "display";
 
-/* 20 lines x 480 px x 2 bytes = 19.2 KB per buffer, in internal DMA RAM.
+/* 12 lines x 480 px x 2 bytes = 11.5 KB per buffer, in internal DMA RAM.
  * The BSP default puts 48 KB buffers in PSRAM, and the SPI driver then needs
  * a 48 KB internal bounce buffer per flush, which fails once Wi-Fi is up. */
-#define BUFFER_LINES 20
+#define BUFFER_LINES 12
 
 static esp_lcd_panel_io_handle_t panel_io;
 static volatile quarter_t quarter;
+static uint16_t *rot_buf; /* one flush in flight at a time, so one rotation buffer is enough */
 
 bool display_lock(int timeout_ms)
 {
@@ -48,6 +50,23 @@ static void map_touch(esp_lcd_touch_handle_t tp, uint16_t *x, uint16_t *y, uint1
         x[i] = (uint16_t)lx;
         y[i] = (uint16_t)ly;
     }
+}
+
+static esp_err_t draw_bitmap(lv_display_t *disp, esp_lcd_panel_handle_t panel, int x1, int y1, int x2, int y2,
+                             const void *map, void *ctx)
+{
+    if (!orientation_software_rotate(quarter)) {
+        return esp_lcd_panel_draw_bitmap(panel, x1, y1, x2, y2, map);
+    }
+    const uint16_t *src = map;
+    int w = x2 - x1, h = y2 - y1, m = BSP_LCD_H_RES - 1;
+    /* LVGL (x, y) -> panel (m - y, x); the destination is h wide and w tall. */
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            rot_buf[x * h + (h - 1 - y)] = src[y * w + x];
+        }
+    }
+    return esp_lcd_panel_draw_bitmap(panel, m + 1 - y2, x1, m + 1 - y1, x2, rot_buf);
 }
 
 static void write_madctl(quarter_t q)
@@ -95,6 +114,10 @@ void display_start(quarter_t initial)
     };
     lv_display_t *disp = esp_lv_adapter_register_display(&disp_cfg);
     lv_display_add_event_cb(disp, round_area, LV_EVENT_INVALIDATE_AREA, NULL);
+    rot_buf = heap_caps_malloc(BSP_LCD_H_RES * BUFFER_LINES * 2, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    assert(rot_buf);
+    const esp_lv_adapter_draw_bitmap_callbacks_t cbs = {.custom_draw_bitmap = draw_bitmap};
+    ESP_ERROR_CHECK(esp_lv_adapter_set_draw_bitmap_callbacks(disp, &cbs, NULL));
 
     bsp_display_cfg_t touch_cfg = {0};
     esp_lcd_touch_handle_t tp;

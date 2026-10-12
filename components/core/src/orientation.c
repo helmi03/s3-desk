@@ -47,21 +47,21 @@ bool orientation_update(orientation_t *o, accel_mg_t a, uint16_t dt_ms)
     return true;
 }
 
-/* The panel draws LVGL pixel L at physical position P = MY(MX(MV(L))) for
- * the MADCTL bits below; touch reports P, so LVGL needs the inverse. */
+/* Physical position P of LVGL pixel L: software 90 degrees for odd quarters,
+ * then the panel's mirror (0xC0 = both axes). Touch reports P; LVGL needs L. */
 void orientation_map_touch(quarter_t q, int size, int ux, int uy, int *lx, int *ly)
 {
     int m = size - 1;
     switch (q & 3) {
-    case 1: /* MV|MX: P = (m - Ly, Lx) */
+    case 1: /* software 90: P = (m - Ly, Lx) */
         *lx = uy;
         *ly = m - ux;
         break;
-    case 2: /* MY|MX: P = (m - Lx, m - Ly) */
+    case 2: /* panel mirror both: P = (m - Lx, m - Ly) */
         *lx = m - ux;
         *ly = m - uy;
         break;
-    case 3: /* MV|MY: P = (Ly, m - Lx) */
+    case 3: /* software 90 then panel mirror both: P = (Ly, m - Lx) */
         *lx = m - uy;
         *ly = ux;
         break;
@@ -74,6 +74,11 @@ void orientation_map_touch(quarter_t q, int size, int ux, int uy, int *lx, int *
 
 uint8_t orientation_madctl(quarter_t q)
 {
-    static const uint8_t MADCTL[4] = {0x00, 0x60, 0xC0, 0xA0};
+    static const uint8_t MADCTL[4] = {0x00, 0x00, 0xC0, 0xC0};
     return MADCTL[q & 3];
+}
+
+bool orientation_software_rotate(quarter_t q)
+{
+    return q & 1;
 }

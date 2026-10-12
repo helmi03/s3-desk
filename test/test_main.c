@@ -409,10 +409,11 @@ static void test_orientation_needs_one_second_of_steady_readings(void)
 static void apply_panel(quarter_t q, int m, int lx, int ly, int *px, int *py)
 {
     uint8_t mad = orientation_madctl(q);
+    TEST_ASSERT_EQUAL_MESSAGE(0, mad & 0x20, "CO5300 ignores MV; never rely on it");
     int x = lx, y = ly;
-    if (mad & 0x20) {
+    if (orientation_software_rotate(q)) {
         int t = x;
-        x = y;
+        x = m - y;
         y = t;
     }
     if (mad & 0x40) {
