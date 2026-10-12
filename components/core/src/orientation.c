@@ -9,14 +9,17 @@ bool orientation_of(accel_mg_t a, quarter_t *out)
     if (abs(a.z) > DOMINANT_MG) {
         return false;
     }
-    if (a.x < -DOMINANT_MG) {
-        *out = 0;
-    } else if (a.x > DOMINANT_MG) {
-        *out = 2;
-    } else if (a.y > DOMINANT_MG) {
-        *out = 1; /* checked on the board with software rotation: the opposite showed text upside down */
-    } else if (a.y < -DOMINANT_MG) {
+    /* Measured on the board: buttons on top reads y = +1 g and needs a 270
+     * turn; buttons on the right reads x = -1 g and showed the unturned
+     * picture upside down. The panel's native "up" is the buttons-left side. */
+    if (a.y > DOMINANT_MG) {
         *out = 3;
+    } else if (a.x < -DOMINANT_MG) {
+        *out = 2;
+    } else if (a.y < -DOMINANT_MG) {
+        *out = 1;
+    } else if (a.x > DOMINANT_MG) {
+        *out = 0;
     } else {
         return false;
     }

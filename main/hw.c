@@ -151,7 +151,7 @@ static bool read_accel(accel_mg_t *out)
 quarter_t hw_orientation_now(void)
 {
     accel_mg_t a;
-    quarter_t q = 0;
+    quarter_t q = 3; /* lying flat: assume buttons on top, the usual way it stands */
     vTaskDelay(pdMS_TO_TICKS(50));
     if (read_accel(&a)) {
         orientation_of(a, &q);

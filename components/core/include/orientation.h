@@ -6,7 +6,7 @@
 typedef uint8_t quarter_t;
 
 /* Accelerometer readings in milli-g, in the QMI8658's axes as mounted on the
- * board: standing upright gravity reads about x = -1000. */
+ * board: standing with the buttons on top, gravity reads about y = +1000. */
 typedef struct {
     int16_t x, y, z;
 } accel_mg_t;

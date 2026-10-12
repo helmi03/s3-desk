@@ -377,14 +377,14 @@ static void test_mawaqit_today_and_calendar(void)
 static void test_orientation_classifies_each_side_and_ignores_flat(void)
 {
     quarter_t q;
-    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){-950, 10, -20}, &q));
-    TEST_ASSERT_EQUAL(0, q);
-    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){980, 0, 0}, &q));
-    TEST_ASSERT_EQUAL(2, q);
-    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){0, 990, 50}, &q));
-    TEST_ASSERT_EQUAL(1, q);
-    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){0, -990, 50}, &q));
+    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){20, 1000, 170}, &q)); /* buttons on top */
     TEST_ASSERT_EQUAL(3, q);
+    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){-950, 0, -40}, &q)); /* buttons on the right */
+    TEST_ASSERT_EQUAL(2, q);
+    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){0, -990, 50}, &q)); /* buttons at the bottom */
+    TEST_ASSERT_EQUAL(1, q);
+    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){980, 0, 0}, &q)); /* buttons on the left */
+    TEST_ASSERT_EQUAL(0, q);
     TEST_ASSERT_FALSE(orientation_of((accel_mg_t){100, 50, 1000}, &q));
     TEST_ASSERT_FALSE(orientation_of((accel_mg_t){-600, 600, 0}, &q));
 }
@@ -403,7 +403,7 @@ static void test_orientation_needs_one_second_of_steady_readings(void)
         changed |= orientation_update(&o, sideways, 150);
     }
     TEST_ASSERT_TRUE(changed);
-    TEST_ASSERT_EQUAL(1, o.stable);
+    TEST_ASSERT_EQUAL(3, o.stable);
 }
 
 static void apply_panel(quarter_t q, int m, int lx, int ly, int *px, int *py)
