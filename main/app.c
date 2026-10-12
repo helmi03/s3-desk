@@ -294,6 +294,7 @@ static void loop_task(void *arg)
         st.model = m;
         xSemaphoreGive(lock);
 
+        display_set_rotation(m.settings.auto_rotate ? hw_orientation() : m.settings.rotation);
         if (display_lock(200)) {
             ui_update(&m);
             display_unlock();

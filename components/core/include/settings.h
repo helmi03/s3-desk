@@ -23,11 +23,12 @@ typedef struct {
     uint8_t brightness; /* 5..100 */
     bool night_dim;
     theme_t theme;
-    uint8_t rotation; /* 0 or 2 (180 degrees) */
+    uint8_t rotation; /* quarter turns clockwise, used when auto_rotate is off */
     source_t source;
     char mawaqit_uuid[48];
     char mawaqit_token[128];
     char pin[8]; /* web pairing PIN, generated on first boot */
+    bool auto_rotate; /* follow the accelerometer; added after v1, keep last */
 } settings_t;
 
 settings_t settings_defaults(void);

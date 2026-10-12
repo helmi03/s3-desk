@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "ms.h"
+#include "orientation.h"
 #include "schedule.h"
 #include "settings.h"
 #include "timetable.h"
@@ -373,6 +374,74 @@ static void test_mawaqit_today_and_calendar(void)
     free(t);
 }
 
+static void test_orientation_classifies_each_side_and_ignores_flat(void)
+{
+    quarter_t q;
+    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){-950, 10, -20}, &q));
+    TEST_ASSERT_EQUAL(0, q);
+    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){980, 0, 0}, &q));
+    TEST_ASSERT_EQUAL(2, q);
+    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){0, 990, 50}, &q));
+    TEST_ASSERT_EQUAL(1, q);
+    TEST_ASSERT_TRUE(orientation_of((accel_mg_t){0, -990, 50}, &q));
+    TEST_ASSERT_EQUAL(3, q);
+    TEST_ASSERT_FALSE(orientation_of((accel_mg_t){100, 50, 1000}, &q));
+    TEST_ASSERT_FALSE(orientation_of((accel_mg_t){-600, 600, 0}, &q));
+}
+
+static void test_orientation_needs_one_second_of_steady_readings(void)
+{
+    orientation_t o = {0};
+    accel_mg_t sideways = {0, 990, 0};
+    for (int t = 0; t < ORIENT_HOLD_MS - 150; t += 150) {
+        TEST_ASSERT_FALSE(orientation_update(&o, sideways, 150));
+    }
+    TEST_ASSERT_FALSE(orientation_update(&o, (accel_mg_t){0, 0, 1000}, 150));
+    TEST_ASSERT_EQUAL(0, o.stable);
+    bool changed = false;
+    for (int t = 0; t <= ORIENT_HOLD_MS; t += 150) {
+        changed |= orientation_update(&o, sideways, 150);
+    }
+    TEST_ASSERT_TRUE(changed);
+    TEST_ASSERT_EQUAL(1, o.stable);
+}
+
+static void apply_panel(quarter_t q, int m, int lx, int ly, int *px, int *py)
+{
+    uint8_t mad = orientation_madctl(q);
+    int x = lx, y = ly;
+    if (mad & 0x20) {
+        int t = x;
+        x = y;
+        y = t;
+    }
+    if (mad & 0x40) {
+        x = m - x;
+    }
+    if (mad & 0x80) {
+        y = m - y;
+    }
+    *px = x;
+    *py = y;
+}
+
+static void test_touch_lands_on_the_pixel_drawn_under_the_finger(void)
+{
+    static const int POINTS[][2] = {{0, 0}, {479, 0}, {0, 479}, {120, 400}, {333, 17}};
+    for (quarter_t q = 0; q < 4; q++) {
+        for (size_t i = 0; i < sizeof(POINTS) / sizeof(POINTS[0]); i++) {
+            int px, py, lx, ly;
+            apply_panel(q, 479, POINTS[i][0], POINTS[i][1], &px, &py);
+            orientation_map_touch(q, 480, px, py, &lx, &ly);
+            TEST_ASSERT_EQUAL(POINTS[i][0], lx);
+            TEST_ASSERT_EQUAL(POINTS[i][1], ly);
+        }
+    }
+    int lx, ly;
+    orientation_map_touch(1, 480, 0, 0, &lx, &ly);
+    TEST_ASSERT_FALSE(lx == 0 && ly == 0);
+}
+
 static void test_dates(void)
 {
     TEST_ASSERT_EQUAL(5, date_weekday(OCT9));
@@ -385,6 +454,9 @@ int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_dates);
+    RUN_TEST(test_orientation_classifies_each_side_and_ignores_flat);
+    RUN_TEST(test_orientation_needs_one_second_of_steady_readings);
+    RUN_TEST(test_touch_lands_on_the_pixel_drawn_under_the_finger);
     RUN_TEST(test_esolat_year_matches_official_klang_times);
     RUN_TEST(test_esolat_parses_every_malay_month_abbreviation);
     RUN_TEST(test_esolat_no_record_object_shape);

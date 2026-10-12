@@ -67,6 +67,7 @@ button.second{background:#2a2a2e;color:var(--text)}
 <label for="brightness">Kecerahan <span id="brightness-v"></span></label>
 <input id="brightness" type="range" min="5" max="100">
 <label><input id="night_dim" type="checkbox">Malapkan skrin waktu malam</label>
+<label><input id="auto_rotate" type="checkbox">Auto-putar skrin ikut kedudukan peranti</label>
 <label for="theme">Tema</label>
 <select id="theme"><option value="0">Gelap</option><option value="1">Hijau</option><option value="2">Biru</option><option value="3">Ungu</option></select>
 <button onclick="saveSettings()">Simpan tetapan</button>
@@ -105,7 +106,7 @@ button.second{background:#2a2a2e;color:var(--text)}
 <input id="fw" type="file" accept=".bin">
 <button class="second" onclick="ota()">Kemas kini</button>
 <div class="row">
-<button class="second" onclick="post('/api/rotate').then(()=>say('dev-msg','Memutar skrin dan memulakan semula...'))">Putar skrin 180°</button>
+<button class="second" onclick="post('/api/rotate').then(()=>{say('dev-msg','Skrin diputar 90°. Auto-putar dimatikan.');loadSettings()})">Putar skrin 90°</button>
 <button class="second" onclick="post('/api/reboot').then(()=>say('dev-msg','Memulakan semula...'))">Mulakan semula</button>
 </div>
 <div class="msg" id="dev-msg"></div>
@@ -145,13 +146,13 @@ async function loadSettings(){
   $('zone').value=s.zone;
   $('adhan').innerHTML=PRAYERS.map(p=>'<label><input type="checkbox" data-p="'+p+'"'+(s.adhan[p]?' checked':'')+'>'+p+'</label>').join('');
   for(const k of['volume','brightness']){$(k).value=s[k];$(k+'-v').textContent=s[k];$(k).oninput=()=>$(k+'-v').textContent=$(k).value}
-  $('night_dim').checked=s.night_dim;$('theme').value=s.theme;
+  $('night_dim').checked=s.night_dim;$('auto_rotate').checked=s.auto_rotate;$('theme').value=s.theme;
   $('use-mawaqit').checked=s.source==='mawaqit';$('uuid').value=s.mawaqit_uuid;
   $('token').placeholder=s.mawaqit_token_set?'(token disimpan; kosongkan untuk kekal)':'';
 }
 async function saveSettings(){
   const adhan={};document.querySelectorAll('#adhan input').forEach(i=>adhan[i.dataset.p]=i.checked);
-  try{await req('/api/settings',{method:'POST',headers:headers(),body:JSON.stringify({zone:$('zone').value,adhan,volume:+$('volume').value,brightness:+$('brightness').value,night_dim:$('night_dim').checked,theme:+$('theme').value})});say('settings-msg','Disimpan.');loadStatus();loadTimes()}
+  try{await req('/api/settings',{method:'POST',headers:headers(),body:JSON.stringify({zone:$('zone').value,adhan,volume:+$('volume').value,brightness:+$('brightness').value,night_dim:$('night_dim').checked,auto_rotate:$('auto_rotate').checked,theme:+$('theme').value})});say('settings-msg','Disimpan.');loadStatus();loadTimes()}
   catch(e){say('settings-msg',e.message,true)}
 }
 async function saveMawaqit(){

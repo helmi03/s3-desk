@@ -17,6 +17,7 @@ settings_t settings_defaults(void)
         .night_dim = true,
         .theme = THEME_GELAP,
         .rotation = 0,
+        .auto_rotate = true,
         .source = SOURCE_ESOLAT,
     };
     return s;
@@ -102,10 +103,10 @@ bool settings_apply_json(settings_t *s, const char *json, size_t len, char *err,
     } else if (ok && present) {
         n.theme = (theme_t)v;
     }
-    if (ok && !(ok = get_int(root, "rotation", 0, 2, &v, &present))) {
+    if (ok && !(ok = get_int(root, "rotation", 0, 3, &v, &present))) {
         msg = "Putaran tidak sah";
     } else if (ok && present) {
-        n.rotation = v ? 2 : 0;
+        n.rotation = (uint8_t)v;
     }
     const cJSON *dim = cJSON_GetObjectItem(root, "night_dim");
     if (ok && dim) {
@@ -114,6 +115,15 @@ bool settings_apply_json(settings_t *s, const char *json, size_t len, char *err,
             msg = "Tetapan malap malam tidak sah";
         } else {
             n.night_dim = cJSON_IsTrue(dim);
+        }
+    }
+    const cJSON *rot = cJSON_GetObjectItem(root, "auto_rotate");
+    if (ok && rot) {
+        if (!cJSON_IsBool(rot)) {
+            ok = false;
+            msg = "Tetapan auto-putar tidak sah";
+        } else {
+            n.auto_rotate = cJSON_IsTrue(rot);
         }
     }
     const cJSON *source = cJSON_GetObjectItem(root, "source");
@@ -172,6 +182,7 @@ char *settings_to_json(const settings_t *s)
     cJSON_AddBoolToObject(root, "night_dim", s->night_dim);
     cJSON_AddNumberToObject(root, "theme", s->theme);
     cJSON_AddNumberToObject(root, "rotation", s->rotation);
+    cJSON_AddBoolToObject(root, "auto_rotate", s->auto_rotate);
     cJSON_AddStringToObject(root, "source", s->source == SOURCE_MAWAQIT ? "mawaqit" : "esolat");
     cJSON_AddStringToObject(root, "mawaqit_uuid", s->mawaqit_uuid);
     cJSON_AddBoolToObject(root, "mawaqit_token_set", s->mawaqit_token[0] != '\0');

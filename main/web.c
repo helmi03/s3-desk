@@ -394,9 +394,9 @@ static esp_err_t h_rotate(httpd_req_t *req)
         return send_error(req, "401 Unauthorized", "PIN salah");
     }
     settings_t s = app_settings();
-    s.rotation = s.rotation ? 0 : 2;
+    s.rotation = (uint8_t)((s.auto_rotate ? hw_orientation() : s.rotation) + 1) % 4;
+    s.auto_rotate = false;
     app_apply_settings(&s, NULL, 0);
-    restart_soon();
     return send_ok(req);
 }
 

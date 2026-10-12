@@ -1,5 +1,6 @@
 #pragma once
 #include "esp_err.h"
+#include "orientation.h"
 #include "schedule.h"
 #include "settings.h"
 #include "timetable.h"
@@ -80,14 +81,16 @@ void console_start(void);
 void hw_init_sensors(void);
 void hw_start(void);
 bool hw_battery(uint8_t *pct, bool *charging);
-bool hw_upside_down(void);
+quarter_t hw_orientation_now(void); /* one reading, 0 if flat or unclear */
+quarter_t hw_orientation(void);     /* last orientation held for a second */
 bool hw_imu_read(int16_t acc[3], int16_t gyr[3]); /* raw: 8192 LSB/g, 32 LSB/dps */
 void hw_set_brightness(int percent);
 
 /* The BSP's bsp_display_lock() returns esp_lv_adapter_lock()'s esp_err_t as a
  * bool, so it reports false when the lock was taken. Use these instead;
  * tools/check.sh rejects bsp_display_lock in main/. */
-void display_start(bool flipped);
+void display_start(quarter_t initial);
+void display_set_rotation(quarter_t q);
 bool display_lock(int timeout_ms);
 void display_unlock(void);
 

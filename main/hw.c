@@ -122,22 +122,6 @@ static void imu_init(void)
     ESP_LOGI(TAG, "QMI8658 ready");
 }
 
-bool hw_upside_down(void)
-{
-    if (!imu) {
-        return false;
-    }
-    vTaskDelay(pdMS_TO_TICKS(50));
-    uint8_t d[6];
-    if (reg_read(imu, QMI8658_AX_L, d, sizeof(d)) != ESP_OK) {
-        return false;
-    }
-    int16_t ax = (int16_t)(d[0] | (d[1] << 8));
-    ESP_LOGI(TAG, "accel x %d", ax);
-    /* Measured on the board: standing upright x reads -0.95 g (y, z ~0); turned 180 degrees it reads +1 g. */
-    return ax > 4096;
-}
-
 bool hw_imu_read(int16_t acc[3], int16_t gyr[3])
 {
     uint8_t d[12];
@@ -149,6 +133,37 @@ bool hw_imu_read(int16_t acc[3], int16_t gyr[3])
         gyr[i] = (int16_t)(d[6 + 2 * i] | (d[6 + 2 * i + 1] << 8));
     }
     return true;
+}
+
+static orientation_t orient;
+
+static bool read_accel(accel_mg_t *out)
+{
+    int16_t a[3], g[3];
+    if (!hw_imu_read(a, g)) {
+        return false;
+    }
+    /* +-4 g range: 8192 LSB per g */
+    *out = (accel_mg_t){(int16_t)(a[0] * 1000 / 8192), (int16_t)(a[1] * 1000 / 8192), (int16_t)(a[2] * 1000 / 8192)};
+    return true;
+}
+
+quarter_t hw_orientation_now(void)
+{
+    accel_mg_t a;
+    quarter_t q = 0;
+    vTaskDelay(pdMS_TO_TICKS(50));
+    if (read_accel(&a)) {
+        orientation_of(a, &q);
+        ESP_LOGI(TAG, "accel %d %d %d mg -> %d degrees", a.x, a.y, a.z, q * 90);
+    }
+    orient.stable = orient.candidate = q;
+    return q;
+}
+
+quarter_t hw_orientation(void)
+{
+    return orient.stable;
 }
 
 void hw_set_brightness(int percent)
@@ -172,6 +187,10 @@ static void poll_task(void *arg)
 {
     for (;;) {
         pmu_poll();
+        accel_mg_t a;
+        if (read_accel(&a) && orientation_update(&orient, a, 150)) {
+            ESP_LOGI(TAG, "orientation now %d degrees", orient.stable * 90);
+        }
         vTaskDelay(pdMS_TO_TICKS(150));
     }
 }

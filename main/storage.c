@@ -70,8 +70,20 @@ static void random_digits(char *out, size_t n)
 
 settings_t storage_load_settings(void)
 {
-    settings_blob_t b;
-    if (nvs_get("settings", &b, sizeof(b)) && b.version == SETTINGS_VERSION) {
+    settings_blob_t b = {0};
+    size_t got = sizeof(b);
+    nvs_handle_t h;
+    bool found = false;
+    if (nvs_open(NS, NVS_READONLY, &h) == ESP_OK) {
+        /* Fields added later sit at the end; an older, shorter blob keeps their defaults. */
+        found = nvs_get_blob(h, "settings", &b, &got) == ESP_OK && got <= sizeof(b) && b.version == SETTINGS_VERSION;
+        nvs_close(h);
+    }
+    if (found) {
+        if (got < sizeof(b)) {
+            b.s.auto_rotate = true;
+            ESP_LOGI(TAG, "settings upgraded from a %u byte blob", (unsigned)got);
+        }
         return b.s;
     }
     settings_t s = settings_defaults();

@@ -53,7 +53,7 @@ static struct {
     lv_obj_t *setup_qr, *setup_text;
     lv_obj_t *waiting_text, *nodata_text;
     /* settings */
-    lv_obj_t *set_switch[P_COUNT], *set_volume, *set_brightness, *set_dim, *set_theme, *set_zone, *set_info;
+    lv_obj_t *set_switch[P_COUNT], *set_volume, *set_brightness, *set_dim, *set_rotate, *set_theme, *set_zone, *set_info;
 } ui;
 
 static const palette_t *pal(void)
@@ -443,6 +443,7 @@ static void settings_changed(lv_event_t *e)
     s.volume = (uint8_t)lv_slider_get_value(ui.set_volume);
     s.brightness = (uint8_t)lv_slider_get_value(ui.set_brightness);
     s.night_dim = lv_obj_has_state(ui.set_dim, LV_STATE_CHECKED);
+    s.auto_rotate = lv_obj_has_state(ui.set_rotate, LV_STATE_CHECKED);
     s.theme = (theme_t)lv_dropdown_get_selected(ui.set_theme);
     uint32_t z = lv_dropdown_get_selected(ui.set_zone);
     if (z < ZONE_COUNT) {
@@ -566,6 +567,13 @@ static void build_settings(lv_obj_t *p)
     lv_obj_align(ui.set_dim, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_obj_add_event_cb(ui.set_dim, settings_changed, LV_EVENT_VALUE_CHANGED, NULL);
 
+    row = settings_row(list, "Auto-putar skrin");
+    ui.set_rotate = lv_switch_create(row);
+    style_control(ui.set_rotate);
+    lv_obj_set_size(ui.set_rotate, 64, 34);
+    lv_obj_align(ui.set_rotate, LV_ALIGN_RIGHT_MID, 0, 0);
+    lv_obj_add_event_cb(ui.set_rotate, settings_changed, LV_EVENT_VALUE_CHANGED, NULL);
+
     h = label(list, &lv_font_montserrat_18, c->muted);
     lv_label_set_text(h, "Tema");
     ui.set_theme = lv_dropdown_create(list);
@@ -619,6 +627,11 @@ static void sync_settings_controls(const settings_t *s)
         lv_obj_add_state(ui.set_dim, LV_STATE_CHECKED);
     } else {
         lv_obj_remove_state(ui.set_dim, LV_STATE_CHECKED);
+    }
+    if (s->auto_rotate) {
+        lv_obj_add_state(ui.set_rotate, LV_STATE_CHECKED);
+    } else {
+        lv_obj_remove_state(ui.set_rotate, LV_STATE_CHECKED);
     }
     lv_dropdown_set_selected(ui.set_theme, s->theme);
     for (size_t i = 0; i < ZONE_COUNT; i++) {

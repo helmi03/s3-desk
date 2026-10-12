@@ -11,9 +11,8 @@ void app_main(void)
     bsp_i2c_init();
     hw_init_sensors();
     settings_t s = storage_load_settings();
-    bool flipped = s.rotation == 2 || hw_upside_down();
-    ESP_LOGI(TAG, "display %s", flipped ? "flipped 180" : "upright");
-    display_start(flipped);
+    quarter_t q = s.auto_rotate ? hw_orientation_now() : s.rotation;
+    display_start(q);
     tables_init();
     audio_init();
     app_start();
