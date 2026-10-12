@@ -14,9 +14,9 @@ bool orientation_of(accel_mg_t a, quarter_t *out)
     } else if (a.x > DOMINANT_MG) {
         *out = 2;
     } else if (a.y > DOMINANT_MG) {
-        *out = 1;
+        *out = 3; /* checked on the board: y > 0 with MADCTL 0x60 showed the text upside down */
     } else if (a.y < -DOMINANT_MG) {
-        *out = 3;
+        *out = 1;
     } else {
         return false;
     }
