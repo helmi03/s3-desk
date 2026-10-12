@@ -25,6 +25,7 @@ static const char *TAG = "hw";
 #define QMI8658_WHO_AM_I 0x00
 #define QMI8658_CTRL1 0x02
 #define QMI8658_CTRL2 0x03
+#define QMI8658_CTRL3 0x04
 #define QMI8658_CTRL7 0x08
 #define QMI8658_AX_L 0x35
 
@@ -116,7 +117,8 @@ static void imu_init(void)
     }
     reg_write(imu, QMI8658_CTRL1, 0x40); /* register address auto-increment */
     reg_write(imu, QMI8658_CTRL2, 0x15); /* +-4 g, 117 Hz */
-    reg_write(imu, QMI8658_CTRL7, 0x01); /* accelerometer on */
+    reg_write(imu, QMI8658_CTRL3, 0x55); /* gyro +-1024 dps */
+    reg_write(imu, QMI8658_CTRL7, 0x03); /* accelerometer and gyro on */
     ESP_LOGI(TAG, "QMI8658 ready");
 }
 
@@ -130,10 +132,23 @@ bool hw_upside_down(void)
     if (reg_read(imu, QMI8658_AX_L, d, sizeof(d)) != ESP_OK) {
         return false;
     }
-    int16_t ay = (int16_t)(d[2] | (d[3] << 8));
-    ESP_LOGI(TAG, "accel y %d", ay);
-    /* Standing upright the y axis reads about +1 g; flipped, about -1 g. */
-    return ay < -4000;
+    int16_t ax = (int16_t)(d[0] | (d[1] << 8));
+    ESP_LOGI(TAG, "accel x %d", ax);
+    /* Measured on the board: standing upright x reads -0.95 g (y, z ~0); turned 180 degrees it reads +1 g. */
+    return ax > 4096;
+}
+
+bool hw_imu_read(int16_t acc[3], int16_t gyr[3])
+{
+    uint8_t d[12];
+    if (!imu || reg_read(imu, QMI8658_AX_L, d, sizeof(d)) != ESP_OK) {
+        return false;
+    }
+    for (int i = 0; i < 3; i++) {
+        acc[i] = (int16_t)(d[2 * i] | (d[2 * i + 1] << 8));
+        gyr[i] = (int16_t)(d[6 + 2 * i] | (d[6 + 2 * i + 1] << 8));
+    }
+    return true;
 }
 
 void hw_set_brightness(int percent)

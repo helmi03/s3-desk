@@ -81,6 +81,7 @@ void hw_init_sensors(void);
 void hw_start(void);
 bool hw_battery(uint8_t *pct, bool *charging);
 bool hw_upside_down(void);
+bool hw_imu_read(int16_t acc[3], int16_t gyr[3]); /* raw: 8192 LSB/g, 32 LSB/dps */
 void hw_set_brightness(int percent);
 
 /* The BSP's bsp_display_lock() returns esp_lv_adapter_lock()'s esp_err_t as a

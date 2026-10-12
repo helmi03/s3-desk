@@ -92,6 +92,22 @@ static int cmd_hold(int argc, char **argv)
     return 0;
 }
 
+static int cmd_imu(int argc, char **argv)
+{
+    int n = argc > 1 ? atoi(argv[1]) : 1;
+    for (int i = 0; i < n; i++) {
+        int16_t a[3], g[3];
+        if (!hw_imu_read(a, g)) {
+            printf("IMU not available\n");
+            return 1;
+        }
+        printf("IMU accel_g %.2f %.2f %.2f gyro_dps %.1f %.1f %.1f\n", a[0] / 8192.0, a[1] / 8192.0, a[2] / 8192.0,
+               g[0] / 32.0, g[1] / 32.0, g[2] / 32.0);
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+    return 0;
+}
+
 static int cmd_set(int argc, char **argv)
 {
     if (argc != 2) {
@@ -196,6 +212,7 @@ void console_start(void)
         {.command = "stop", .help = "stop audio", .func = cmd_stop},
         {.command = "key", .help = "simulate a GPIO18 key press", .func = cmd_key},
         {.command = "hold", .help = "simulate holding the GPIO18 key (toggles Tetapan)", .func = cmd_hold},
+        {.command = "imu", .help = "imu [N]: print accelerometer and gyro N times", .func = cmd_imu},
         {.command = "set", .help = "apply settings JSON", .func = cmd_set},
         {.command = "view", .help = "view 0|1|2|settings", .func = cmd_view},
         {.command = "snap", .help = "dump the screen as base64 RGB565", .func = cmd_snap},
