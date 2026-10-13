@@ -863,10 +863,10 @@ static void on_screen_event(lv_event_t *e)
 static void build_all(void)
 {
     lv_obj_t *scr = lv_screen_active();
-    lv_obj_clean(scr);
     if (ui.pomo_alert) {
         hide_pomo_alert(); /* stops its animation and timer; the clean below deletes it */
     }
+    lv_obj_clean(scr);
     memset(ui.set_switch, 0, sizeof(ui.set_switch));
     lv_obj_set_style_bg_color(scr, col(pal()->bg), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
