@@ -419,7 +419,7 @@ static void build_pomo_alert(void)
     lv_obj_align(hint, LV_ALIGN_CENTER, 0, 40);
 }
 
-static void on_pomo_timer(lv_timer_t *t)
+uint32_t ui_pomodoro_poll(void)
 {
     if (pomodoro_tick(&ui.pomo, lv_tick_get())) {
         if (ui.mode != UI_MODE_ADHAN) {
@@ -429,6 +429,12 @@ static void on_pomo_timer(lv_timer_t *t)
             ui.actions->pomodoro_done();
         }
     }
+    return ui.pomo.running ? ui.pomo.left_ms : UINT32_MAX;
+}
+
+static void on_pomo_timer(lv_timer_t *t)
+{
+    ui_pomodoro_poll();
     if (ui.mode == UI_MODE_VIEW && ui.view == UI_VIEW_POMODORO) {
         update_pomodoro();
     }

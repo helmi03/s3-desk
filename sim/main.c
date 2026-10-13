@@ -290,6 +290,26 @@ int main(int argc, char **argv)
     shot(dir, "pomodoro-rehat");
     printf("pomodoro alert shows and closes\n");
 
+    /* With the screen off LVGL's timers are paused and the firmware polls instead. */
+    tap(112, 426); /* reset: stops the break */
+    tap(368, 426); /* skip to focus */
+    if (ui_pomodoro_poll() != UINT32_MAX) {
+        return fail("poll reports time left on a stopped pomodoro");
+    }
+    tap(240, 426); /* Mula */
+    uint32_t left = ui_pomodoro_poll();
+    if (left > POMO_FOCUS_S * 1000u || left < POMO_FOCUS_S * 1000u - 1000) {
+        fprintf(stderr, "FAIL poll after start returned %u ms, want about 25 min\n", (unsigned)left);
+        return 1;
+    }
+    lv_tick_inc(left + 1000);
+    ui_pomodoro_poll();
+    if (!ui_pomodoro_alert_shown()) {
+        return fail("poll past the end of focus did not show the alert");
+    }
+    tap(240, 240);
+    printf("pomodoro poll counts down and alerts without LVGL timers\n");
+
     if (clipped) {
         fprintf(stderr, "%d clipped or truncated labels\n", clipped);
         return 1;

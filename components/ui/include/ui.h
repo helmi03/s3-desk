@@ -1,4 +1,6 @@
 #pragma once
+#include <stdint.h>
+
 #include "schedule.h"
 #include "settings.h"
 #include "timetable.h"
@@ -71,5 +73,9 @@ void ui_step_view(int dir);
 void ui_open_settings(bool open);
 ui_mode_t ui_current_mode(void);
 ui_view_t ui_current_view(void);
+/* Advances the Pomodoro to lv_tick_get(), showing the alert if a phase ran
+ * out. Returns ms until the running phase ends, UINT32_MAX when stopped.
+ * For callers that run while LVGL's timers are paused. */
+uint32_t ui_pomodoro_poll(void);
 /* True while the end-of-phase Pomodoro alert is on screen. */
 bool ui_pomodoro_alert_shown(void);
