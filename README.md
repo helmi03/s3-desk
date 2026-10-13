@@ -55,4 +55,6 @@ for offline use. [Mawaqit](https://mawaqit.net) is optional.
 | `sim/` | Headless simulator that renders every screen to PNG. |
 | `test/` | Unity host tests. |
 
-Third-party credits are in [NOTICE.md](NOTICE.md).
+## License
+
+[MIT](LICENSE). Third-party credits are in [NOTICE.md](NOTICE.md).
