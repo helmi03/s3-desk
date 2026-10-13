@@ -175,7 +175,8 @@ static void footer_text(const ui_model_t *m, char *buf, size_t cap)
 {
     char hm[12];
     ms_format_time((uint16_t)(m->now.second / 60), hm, sizeof(hm));
-    const char *net = m->net == UI_NET_ONLINE ? "" : m->net == UI_NET_CONNECTING ? "  Wi-Fi..." : "  Luar talian";
+    /* Wi-Fi is off most of the time by design (wifi_policy.h), so off is not worth showing. */
+    const char *net = m->net == UI_NET_CONNECTING ? "  Wi-Fi..." : "";
     char bat[24] = "";
     if (m->battery_present) {
         snprintf(bat, sizeof(bat), "  Bateri %u%%%s", m->battery_pct, m->charging ? "+" : "");
@@ -871,9 +872,6 @@ static void build_all(void)
     lv_obj_set_style_bg_color(scr, col(pal()->bg), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
     lv_obj_set_scrollable(scr, false);
-    lv_obj_add_event_cb(scr, on_screen_event, LV_EVENT_GESTURE, NULL);
-    lv_obj_add_event_cb(scr, on_screen_event, LV_EVENT_SHORT_CLICKED, NULL);
-    lv_obj_add_event_cb(scr, on_screen_event, LV_EVENT_LONG_PRESSED, NULL);
 
     ui.root = panel(scr);
     lv_obj_set_hidden(ui.root, false);
@@ -982,6 +980,12 @@ void ui_init(const ui_actions_t *actions)
     while ((indev = lv_indev_get_next(indev)) != NULL) {
         lv_indev_set_long_press_time(indev, 1500);
     }
+    /* Here, not in build_all: lv_obj_clean() keeps the screen's own callbacks, so each
+     * theme rebuild would add another set and one tap would step several screens. */
+    lv_obj_t *scr = lv_screen_active();
+    lv_obj_add_event_cb(scr, on_screen_event, LV_EVENT_GESTURE, NULL);
+    lv_obj_add_event_cb(scr, on_screen_event, LV_EVENT_SHORT_CLICKED, NULL);
+    lv_obj_add_event_cb(scr, on_screen_event, LV_EVENT_LONG_PRESSED, NULL);
     build_all();
 }
 

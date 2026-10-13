@@ -274,6 +274,21 @@ int main(int argc, char **argv)
     }
     printf("swipes step one screen at a time\n");
 
+    /* One tap moves exactly one screen, after a theme change rebuilt the UI. */
+    m = model_at(&tt, oct9, 15, 30, 20, THEME_HIJAU);
+    ui_update(&m);
+    ui_show_view(UI_VIEW_LIST);
+    tap(240, 240);
+    if (ui_current_view() != UI_VIEW_CLOCK) {
+        fprintf(stderr, "FAIL one tap moved to view %d, expected %d\n", (int)ui_current_view(), (int)UI_VIEW_CLOCK);
+        return 1;
+    }
+    drag(400, 240, 80, 240);
+    if (ui_current_view() != UI_VIEW_COUNTDOWN) {
+        return fail("swipe after a theme change did not move one screen");
+    }
+    printf("taps step one screen at a time\n");
+
     /* Pomodoro: start, let focus run out, expect the silent alert. */
     ui_show_view(UI_VIEW_POMODORO);
     tap(240, 426); /* Mula */
