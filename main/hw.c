@@ -183,10 +183,35 @@ static void on_key_hold(void *btn, void *ctx)
     app_button_hold();
 }
 
+static volatile bool low_power;
+
+void hw_set_low_power(bool low)
+{
+    if (low) {
+        low_power = true;
+        if (imu) {
+            reg_write(imu, QMI8658_CTRL7, 0x00);
+        }
+        return;
+    }
+    if (imu) {
+        reg_write(imu, QMI8658_CTRL7, 0x03);
+    }
+    /* Seeded before polling resumes, so the screen wakes upright without the 1 s hold.
+     * Its 50 ms wait covers the accelerometer's first sample after power-up. */
+    hw_orientation_now();
+    low_power = false;
+}
+
+/* The AXP2101 latches the power-key IRQ, so the slow low-power poll loses no presses. */
 static void poll_task(void *arg)
 {
     for (;;) {
         pmu_poll();
+        if (low_power) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
+        }
         accel_mg_t a;
         if (read_accel(&a) && orientation_update(&orient, a, 150)) {
             ESP_LOGI(TAG, "orientation now %d degrees", orient.stable * 90);
@@ -204,7 +229,7 @@ void hw_init_sensors(void)
 void hw_start(void)
 {
     button_config_t cfg = {.long_press_time = 1000};
-    button_gpio_config_t gpio = {.gpio_num = USER_KEY_GPIO, .active_level = 0};
+    button_gpio_config_t gpio = {.gpio_num = USER_KEY_GPIO, .active_level = 0, .enable_power_save = true};
     button_handle_t btn = NULL;
     if (iot_button_new_gpio_device(&cfg, &gpio, &btn) == ESP_OK) {
         iot_button_register_cb(btn, BUTTON_SINGLE_CLICK, NULL, on_key, NULL);
