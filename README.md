@@ -25,6 +25,9 @@ At each prayer time the azan plays, once per prayer, and you tap the screen to s
 button to open **Tetapan** (settings): azan per prayer, volume, brightness, night dimming, auto-rotate, theme and
 zone.
 
+A short press of the power button turns the screen off, and while it is off, Wi-Fi, touch, sensors and rendering
+sleep, but the azan still plays and the Pomodoro still alerts.
+
 ## Hardware
 
 [Waveshare ESP32-S3-Touch-AMOLED-2.16](https://www.waveshare.com/esp32-s3-touch-amoled-2.16.htm): 480×480 CO5300

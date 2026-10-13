@@ -71,6 +71,9 @@ Three layers, so most logic runs and is tested on the Mac:
 - **LVGL events:** a swipe still ends in `SHORT_CLICKED`. The gesture handler calls `lv_indev_wait_release()`
   so one swipe moves exactly one screen. Use LVGL 9.6's dedicated setters and getters (`lv_obj_set_hidden`,
   `lv_obj_is_hidden`); the generic flag API is deprecated.
+- **Low power:** it is active while the screen is off. `main/power.c` switches it, and only the app loop calls
+  it. `lv_tick_set_cb` reads `esp_timer`, so LVGL time keeps running while the adapter is paused. Leaving
+  deep standby resets the panel, which loses MADCTL and brightness, so both are re-sent on wake.
 
 ### Data and assets
 
