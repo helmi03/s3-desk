@@ -7,6 +7,7 @@
 #include "esp_console.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_pm.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -165,6 +166,21 @@ static int cmd_tasks(int argc, char **argv)
     return 0;
 }
 
+static int cmd_pm(int argc, char **argv)
+{
+    return esp_pm_dump_locks(stdout) == ESP_OK ? 0 : 1;
+}
+
+static int cmd_screen(int argc, char **argv)
+{
+    if (argc != 2 || (strcmp(argv[1], "on") != 0 && strcmp(argv[1], "off") != 0)) {
+        printf("usage: screen on|off\n");
+        return 1;
+    }
+    app_set_screen(strcmp(argv[1], "on") == 0);
+    return 0;
+}
+
 static int cmd_reboot(int argc, char **argv)
 {
     esp_restart();
@@ -224,6 +240,8 @@ void console_start(void)
         {.command = "view", .help = "view 0|1|2|3|settings", .func = cmd_view},
         {.command = "snap", .help = "dump the screen as base64 RGB565", .func = cmd_snap},
         {.command = "tasks", .help = "list tasks with state and CPU time", .func = cmd_tasks},
+        {.command = "pm", .help = "list power management locks", .func = cmd_pm},
+        {.command = "screen", .help = "screen on|off: wake or enter low-power mode", .func = cmd_screen},
         {.command = "reboot", .help = "restart", .func = cmd_reboot},
     };
     for (size_t i = 0; i < sizeof(cmds) / sizeof(cmds[0]); i++) {
