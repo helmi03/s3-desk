@@ -1,8 +1,5 @@
 #include "app.h"
 #include "bsp/esp-bsp.h"
-#include "esp_log.h"
-
-static const char *TAG = "main";
 
 void app_main(void)
 {
