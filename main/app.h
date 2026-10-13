@@ -20,11 +20,17 @@ void app_test_adhan(void);
 void app_button_press(void);
 void app_button_hold(void);
 void app_power_short_press(void);
+void app_set_screen(bool on);
 void app_fake_prayer(int minutes_ahead);
 void app_set_stale(bool stale);
 void app_set_mawaqit_name(const char *name);
 /* Copies today's/tomorrow's times and status for the web API. */
 void app_snapshot(ui_model_t *out);
+
+/* power.c: low-power mode while the screen is off. Transitions run only on the app loop task. */
+typedef enum { POWER_ACTIVE, POWER_LOW } power_mode_t;
+void power_init(void);
+void power_set_low(bool low);
 
 /* clock.c */
 void clock_init(void);
@@ -70,6 +76,10 @@ void net_ap_credentials(char *ssid, size_t ssid_cap, char *pass, size_t pass_cap
 esp_err_t net_set_wifi(const char *ssid, const char *pass);
 void net_reset_wifi(void);
 char *net_scan_json(void);
+/* Stops STA Wi-Fi while low, waking it hourly to resync SNTP; SoftAP setup stays up.
+ * Both run only on the app loop task. */
+void net_set_low_power(bool low);
+void net_low_power_tick(void);
 
 /* web.c */
 void web_start(void);
@@ -85,12 +95,17 @@ quarter_t hw_orientation_now(void); /* one reading, 0 if flat or unclear */
 quarter_t hw_orientation(void);     /* last orientation held for a second */
 bool hw_imu_read(int16_t acc[3], int16_t gyr[3]); /* raw: 8192 LSB/g, 32 LSB/dps */
 void hw_set_brightness(int percent);
+/* Low: IMU off and the PMU polled once a second. Leaving re-reads the orientation. */
+void hw_set_low_power(bool low);
 
 /* The BSP's bsp_display_lock() returns esp_lv_adapter_lock()'s esp_err_t as a
  * bool, so it reports false when the lock was taken. Use these instead;
  * tools/check.sh rejects bsp_display_lock in main/. */
 void display_start(quarter_t initial);
 void display_set_rotation(quarter_t q);
+/* Pauses LVGL and puts the panel and touch into deep sleep, or wakes them.
+ * Call without holding display_lock: pausing waits for the LVGL task. */
+void display_sleep(bool sleep);
 extern volatile bool display_touch_log;
 bool display_lock(int timeout_ms);
 void display_unlock(void);

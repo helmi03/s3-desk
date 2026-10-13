@@ -36,6 +36,15 @@ static struct {
 
 /* Set from the LVGL task, which must not take `lock`; the loop applies it. */
 static volatile bool wake_requested;
+static TaskHandle_t loop_handle;
+
+/* The loop sleeps up to 10 s with the screen off; this makes it react at once. */
+static void notify_loop(void)
+{
+    if (loop_handle) {
+        xTaskNotifyGive(loop_handle);
+    }
+}
 
 static void with_lock(void (*fn)(void *), void *ctx)
 {
@@ -105,6 +114,7 @@ void app_button_press(void)
     bool playing = st.adhan_playing;
     st.screen_off = false;
     xSemaphoreGive(lock);
+    notify_loop();
     if (playing) {
         app_stop_adhan();
         return;
@@ -121,6 +131,7 @@ void app_button_hold(void)
     bool playing = st.adhan_playing;
     st.screen_off = false;
     xSemaphoreGive(lock);
+    notify_loop();
     if (playing) {
         app_stop_adhan();
         return;
@@ -139,9 +150,18 @@ void app_power_short_press(void)
         st.screen_off = !st.screen_off;
     }
     xSemaphoreGive(lock);
+    notify_loop();
     if (playing) {
         app_stop_adhan();
     }
+}
+
+void app_set_screen(bool on)
+{
+    xSemaphoreTake(lock, portMAX_DELAY);
+    st.screen_off = !on;
+    xSemaphoreGive(lock);
+    notify_loop();
 }
 
 void app_fake_prayer(int minutes_ahead)
@@ -239,14 +259,20 @@ static void check_adhan(ui_model_t *m)
              m->now.date.day, st.adhan_playing ? "playing" : "AUDIO FAILED");
 }
 
-static void apply_brightness(const ui_model_t *m)
+static int brightness_for(const ui_model_t *m)
 {
-    static int last = -1;
-    int b = st.screen_off ? 0 : m->dimmed ? (st.settings.brightness < DIM_BRIGHTNESS ? st.settings.brightness : DIM_BRIGHTNESS)
-                                          : st.settings.brightness;
-    if (b != last) {
+    int b = m->settings.brightness;
+    return m->dimmed && b > DIM_BRIGHTNESS ? DIM_BRIGHTNESS : b;
+}
+
+/* Last value sent to the panel, -1 when unknown. */
+static int shown_brightness = -1;
+
+static void show_brightness(int b)
+{
+    if (b != shown_brightness) {
         hw_set_brightness(b);
-        last = b;
+        shown_brightness = b;
     }
 }
 
@@ -268,6 +294,7 @@ static void mark_app_valid_after(int64_t ticks)
 static void loop_task(void *arg)
 {
     static ui_model_t m;
+    power_mode_t applied = POWER_ACTIVE;
     for (;;) {
         wallclock_t now = clock_now();
         bool reload = false;
@@ -297,17 +324,40 @@ static void loop_task(void *arg)
         }
         build_model(&m, now);
         check_adhan(&m);
-        apply_brightness(&m);
+        power_mode_t want = st.screen_off ? POWER_LOW : POWER_ACTIVE;
+        int brightness = brightness_for(&m);
         st.model = m;
         xSemaphoreGive(lock);
 
-        display_set_rotation(m.settings.auto_rotate ? hw_orientation() : m.settings.rotation);
-        if (display_lock(200)) {
-            ui_update(&m);
-            display_unlock();
+        if (want != applied) {
+            if (want == POWER_LOW) {
+                show_brightness(0);
+            }
+            power_set_low(want == POWER_LOW);
+            /* Deep standby lost register 0x51, so the brightness below must be re-sent. */
+            shown_brightness = want == POWER_LOW ? 0 : -1;
+            applied = want;
+        }
+
+        TickType_t wait = pdMS_TO_TICKS(250);
+        if (applied == POWER_ACTIVE) {
+            display_set_rotation(m.settings.auto_rotate ? hw_orientation() : m.settings.rotation);
+            if (display_lock(200)) {
+                ui_update(&m);
+                display_unlock();
+            }
+            show_brightness(brightness);
+        } else {
+            uint32_t pomo_ms = UINT32_MAX;
+            if (display_lock(200)) {
+                pomo_ms = ui_pomodoro_poll();
+                display_unlock();
+            }
+            net_low_power_tick();
+            wait = pdMS_TO_TICKS(pomo_ms < 10000 ? pomo_ms : 10000);
         }
         mark_app_valid_after(pdMS_TO_TICKS(30000));
-        vTaskDelay(pdMS_TO_TICKS(250));
+        ulTaskNotifyTake(pdTRUE, wait);
     }
 }
 
@@ -329,6 +379,7 @@ static void ui_reset_wifi(void)
 static void ui_pomodoro_done(void)
 {
     wake_requested = true;
+    notify_loop();
 }
 
 static const ui_actions_t ACTIONS = {
@@ -351,5 +402,6 @@ void app_start(void)
         ui_init(&ACTIONS);
         display_unlock();
     }
-    xTaskCreatePinnedToCore(loop_task, "app", 8192, NULL, 4, NULL, 0);
+    power_init();
+    xTaskCreatePinnedToCore(loop_task, "app", 8192, NULL, 4, &loop_handle, 0);
 }
