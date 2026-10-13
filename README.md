@@ -5,8 +5,11 @@ Pomodoro. Malay UI, auto-rotate, web setup.
 
 <p align="center">
   <img src="docs/pomodoro.jpg" alt="s3-desk showing the Pomodoro screen" width="420">
-  <video src="https://github.com/user-attachments/assets/e9146312-0537-4986-9cde-1390d4f06b29" width="480" controls muted></video>
 </p>
+
+https://github.com/user-attachments/assets/e9146312-0537-4986-9cde-1390d4f06b29
+
+[Watch on YouTube](https://youtu.be/GoqYd1FkH3o)
 
 
 ## Screens
