@@ -1,4 +1,4 @@
-set(CORE_SRCS src/prayer.c src/timetable.c src/schedule.c src/ms.c src/settings.c src/zones.c src/zones_table.c src/orientation.c)
+set(CORE_SRCS src/prayer.c src/timetable.c src/schedule.c src/ms.c src/settings.c src/zones.c src/zones_table.c src/orientation.c src/pomodoro.c)
 
 if(ESP_PLATFORM)
     idf_component_register(SRCS ${CORE_SRCS} INCLUDE_DIRS include PRIV_REQUIRES json)

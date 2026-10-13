@@ -175,7 +175,7 @@ int main(int argc, char **argv)
     timetable_t tt = {.tables = {y2026}, .count = 1};
     date_t oct9 = {2026, 10, 9};
     static const char *const THEME_FILE[THEME_COUNT] = {"gelap", "hijau", "biru", "ungu"};
-    static const char *const VIEW_FILE[UI_VIEW_COUNT] = {"senarai", "jam", "kiraan"};
+    static const char *const VIEW_FILE[UI_VIEW_COUNT] = {"senarai", "jam", "kiraan", "pomodoro"};
 
     lv_indev_t *pointer = lv_indev_create();
     lv_indev_set_type(pointer, LV_INDEV_TYPE_POINTER);

@@ -4,6 +4,7 @@
 
 #include "ms.h"
 #include "orientation.h"
+#include "pomodoro.h"
 #include "schedule.h"
 #include "settings.h"
 #include "timetable.h"
@@ -465,10 +466,52 @@ static void test_dates(void)
     TEST_ASSERT_TRUE(date_valid((date_t){2028, 2, 29}));
 }
 
+static void test_pomodoro_counts_down_only_while_running(void)
+{
+    pomodoro_t p;
+    pomodoro_init(&p);
+    TEST_ASSERT_EQUAL_UINT32(25 * 60, pomodoro_seconds_left(&p));
+    TEST_ASSERT_FALSE(pomodoro_tick(&p, 5000));
+    TEST_ASSERT_EQUAL_UINT32(25 * 60, pomodoro_seconds_left(&p));
+    pomodoro_toggle(&p, 10000);
+    pomodoro_tick(&p, 10500);
+    TEST_ASSERT_EQUAL_UINT32(25 * 60, pomodoro_seconds_left(&p)); /* 1499.5 s shows as 25:00 */
+    pomodoro_tick(&p, 70000);
+    TEST_ASSERT_EQUAL_UINT32(24 * 60, pomodoro_seconds_left(&p));
+    TEST_ASSERT_EQUAL_UINT16(40, pomodoro_progress_permille(&p));
+    pomodoro_toggle(&p, 80000); /* pause: the 10 s before it still count */
+    TEST_ASSERT_EQUAL_UINT32(24 * 60 - 10, pomodoro_seconds_left(&p));
+    pomodoro_tick(&p, 999000);
+    TEST_ASSERT_EQUAL_UINT32(24 * 60 - 10, pomodoro_seconds_left(&p));
+    pomodoro_reset(&p);
+    TEST_ASSERT_FALSE(p.running);
+    TEST_ASSERT_EQUAL_UINT32(25 * 60, pomodoro_seconds_left(&p));
+}
+
+static void test_pomodoro_rolls_into_the_other_phase_and_keeps_running(void)
+{
+    pomodoro_t p;
+    pomodoro_init(&p);
+    uint32_t t0 = 0xFFFFF000u; /* the millisecond clock wraps mid-focus */
+    pomodoro_toggle(&p, t0);
+    TEST_ASSERT_FALSE(pomodoro_tick(&p, t0 + 25 * 60 * 1000 - 1));
+    TEST_ASSERT_TRUE(pomodoro_tick(&p, t0 + 25 * 60 * 1000 + 3000));
+    TEST_ASSERT_EQUAL(POMO_BREAK, p.phase);
+    TEST_ASSERT_TRUE(p.running);
+    TEST_ASSERT_EQUAL_UINT32(5 * 60 - 3, pomodoro_seconds_left(&p));
+    pomodoro_skip(&p, t0 + 25 * 60 * 1000 + 4000);
+    TEST_ASSERT_EQUAL(POMO_FOCUS, p.phase);
+    TEST_ASSERT_TRUE(p.running);
+    TEST_ASSERT_EQUAL_UINT32(25 * 60, pomodoro_seconds_left(&p));
+    TEST_ASSERT_EQUAL_UINT16(0, pomodoro_progress_permille(&p));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_dates);
+    RUN_TEST(test_pomodoro_counts_down_only_while_running);
+    RUN_TEST(test_pomodoro_rolls_into_the_other_phase_and_keeps_running);
     RUN_TEST(test_orientation_classifies_each_side_and_ignores_flat);
     RUN_TEST(test_orientation_needs_one_second_of_steady_readings);
     RUN_TEST(test_touch_lands_on_the_pixel_drawn_under_the_finger);

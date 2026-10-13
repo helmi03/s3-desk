@@ -319,11 +319,19 @@ static void ui_reset_wifi(void)
     net_reset_wifi();
 }
 
+static void ui_pomodoro_done(void)
+{
+    if (!audio_is_playing()) {
+        audio_play(TONE_FILE);
+    }
+}
+
 static const ui_actions_t ACTIONS = {
     .stop_adhan = ui_stop,
     .test_adhan = app_test_adhan,
     .apply_settings = ui_apply,
     .reset_wifi = ui_reset_wifi,
+    .pomodoro_done = ui_pomodoro_done,
 };
 
 void app_start(void)

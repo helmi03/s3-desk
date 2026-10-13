@@ -37,12 +37,14 @@ typedef struct {
     void (*test_adhan)(void);
     void (*apply_settings)(const settings_t *s);
     void (*reset_wifi)(void);
+    void (*pomodoro_done)(void); /* a focus or break phase ran out */
 } ui_actions_t;
 
 typedef enum {
     UI_VIEW_LIST,
     UI_VIEW_CLOCK,
     UI_VIEW_COUNTDOWN,
+    UI_VIEW_POMODORO,
     UI_VIEW_COUNT
 } ui_view_t;
 

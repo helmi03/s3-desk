@@ -3,6 +3,7 @@
 
 #include "lvgl.h"
 #include "ms.h"
+#include "pomodoro.h"
 #include "ui.h"
 #include "zones.h"
 
@@ -54,6 +55,10 @@ static struct {
     lv_obj_t *clock_scale, *clock_hour, *clock_min, *clock_sec, *clock_digital, *clock_date, *clock_next;
     /* countdown view */
     lv_obj_t *cd_label, *cd_name, *cd_time, *cd_remaining, *cd_footer;
+    /* pomodoro view */
+    pomodoro_t pomo;
+    lv_timer_t *pomo_timer;
+    lv_obj_t *pomo_phase, *pomo_arc, *pomo_time, *pomo_toggle;
     /* overlays */
     lv_obj_t *adhan_name, *adhan_time;
     lv_obj_t *setup_qr, *setup_text;
@@ -329,6 +334,91 @@ static void update_countdown(const ui_model_t *m)
     }
     footer_text(m, buf, sizeof(buf));
     set_text(ui.cd_footer, buf);
+}
+
+/* ---------- pomodoro view ---------- */
+
+static void update_pomodoro(void)
+{
+    char buf[16];
+    set_text(ui.pomo_phase, ui.pomo.phase == POMO_FOCUS ? "Fokus" : "Rehat");
+    lv_arc_set_value(ui.pomo_arc, 1000 - pomodoro_progress_permille(&ui.pomo));
+    uint32_t s = pomodoro_seconds_left(&ui.pomo);
+    snprintf(buf, sizeof(buf), "%02lu:%02lu", (unsigned long)(s / 60), (unsigned long)(s % 60));
+    set_text(ui.pomo_time, buf);
+    set_text(ui.pomo_toggle, ui.pomo.running ? "Tangguh" : "Mula");
+}
+
+static void on_pomo_timer(lv_timer_t *t)
+{
+    if (pomodoro_tick(&ui.pomo, lv_tick_get()) && ui.actions && ui.actions->pomodoro_done) {
+        ui.actions->pomodoro_done();
+    }
+    if (ui.mode == UI_MODE_VIEW && ui.view == UI_VIEW_POMODORO) {
+        update_pomodoro();
+    }
+}
+
+static void on_pomo_button(lv_event_t *e)
+{
+    switch ((uintptr_t)lv_event_get_user_data(e)) {
+    case 0:
+        pomodoro_reset(&ui.pomo);
+        break;
+    case 1:
+        pomodoro_toggle(&ui.pomo, lv_tick_get());
+        break;
+    default:
+        pomodoro_skip(&ui.pomo, lv_tick_get());
+        break;
+    }
+    update_pomodoro();
+}
+
+static lv_obj_t *pomo_button(lv_obj_t *p, int32_t x, int32_t w, uint32_t bg, uint32_t fg, const char *text,
+                             uintptr_t which)
+{
+    lv_obj_t *b = lv_button_create(p);
+    lv_obj_set_size(b, w, 56);
+    lv_obj_set_pos(b, x, 398);
+    lv_obj_set_style_bg_color(b, col(bg), 0);
+    lv_obj_set_style_radius(b, 12, 0);
+    lv_obj_set_style_shadow_width(b, 0, 0);
+    lv_obj_add_event_cb(b, on_pomo_button, LV_EVENT_CLICKED, (void *)which);
+    lv_obj_t *l = label(b, &font_paper_22, fg);
+    lv_label_set_text(l, text);
+    lv_obj_center(l);
+    return l;
+}
+
+static void build_pomodoro(lv_obj_t *p)
+{
+    const palette_t *c = pal();
+    ui.pomo_phase = label(p, &font_paper_28, c->accent);
+    lv_obj_align(ui.pomo_phase, LV_ALIGN_TOP_MID, 0, 26);
+
+    ui.pomo_arc = lv_arc_create(p);
+    lv_obj_set_size(ui.pomo_arc, 290, 290);
+    lv_obj_align(ui.pomo_arc, LV_ALIGN_TOP_MID, 0, 84);
+    lv_arc_set_rotation(ui.pomo_arc, 270);
+    lv_arc_set_bg_angles(ui.pomo_arc, 0, 360);
+    lv_arc_set_range(ui.pomo_arc, 0, 1000);
+    lv_obj_remove_style(ui.pomo_arc, NULL, LV_PART_KNOB);
+    lv_obj_set_clickable(ui.pomo_arc, false);
+    lv_obj_set_style_arc_width(ui.pomo_arc, 14, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(ui.pomo_arc, 14, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(ui.pomo_arc, col(c->surface), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(ui.pomo_arc, col(c->accent), LV_PART_INDICATOR);
+
+    ui.pomo_time = label(p, &font_digits_72, c->text);
+    lv_obj_set_width(ui.pomo_time, 290);
+    lv_obj_set_style_text_align(ui.pomo_time, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align_to(ui.pomo_time, ui.pomo_arc, LV_ALIGN_CENTER, 0, 0);
+
+    pomo_button(p, 80, 64, c->surface, c->text, LV_SYMBOL_REFRESH, 0);
+    ui.pomo_toggle = pomo_button(p, 160, 160, c->accent, c->on_accent, "", 1);
+    pomo_button(p, 336, 64, c->surface, c->text, LV_SYMBOL_NEXT, 2);
+    update_pomodoro();
 }
 
 /* ---------- overlays ---------- */
@@ -710,6 +800,7 @@ static void build_all(void)
     build_list(ui.view_obj[UI_VIEW_LIST]);
     build_clock(ui.view_obj[UI_VIEW_CLOCK]);
     build_countdown(ui.view_obj[UI_VIEW_COUNTDOWN]);
+    build_pomodoro(ui.view_obj[UI_VIEW_POMODORO]);
     build_adhan(ui.mode_obj[UI_MODE_ADHAN]);
     build_setup(ui.mode_obj[UI_MODE_SETUP]);
     build_message(ui.mode_obj[UI_MODE_WAITING_TIME], &ui.waiting_text, "Menunggu masa", true);
@@ -763,8 +854,10 @@ static void render(void)
             update_list(m);
         } else if (ui.view == UI_VIEW_CLOCK) {
             update_clock(m);
-        } else {
+        } else if (ui.view == UI_VIEW_COUNTDOWN) {
             update_countdown(m);
+        } else {
+            update_pomodoro();
         }
         break;
     case UI_MODE_ADHAN:
@@ -791,6 +884,8 @@ void ui_init(const ui_actions_t *actions)
     ui.actions = actions;
     ui.theme = THEME_GELAP;
     ui.model.settings = settings_defaults();
+    pomodoro_init(&ui.pomo);
+    ui.pomo_timer = lv_timer_create(on_pomo_timer, 200, NULL);
     lv_indev_t *indev = NULL;
     while ((indev = lv_indev_get_next(indev)) != NULL) {
         lv_indev_set_long_press_time(indev, 1500);

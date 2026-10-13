@@ -221,7 +221,7 @@ void console_start(void)
         {.command = "imu", .help = "imu [N]: print accelerometer and gyro N times", .func = cmd_imu},
         {.command = "touchlog", .help = "touchlog 1|0: log touch coordinates", .func = cmd_touchlog},
         {.command = "set", .help = "apply settings JSON", .func = cmd_set},
-        {.command = "view", .help = "view 0|1|2|settings", .func = cmd_view},
+        {.command = "view", .help = "view 0|1|2|3|settings", .func = cmd_view},
         {.command = "snap", .help = "dump the screen as base64 RGB565", .func = cmd_snap},
         {.command = "tasks", .help = "list tasks with state and CPU time", .func = cmd_tasks},
         {.command = "reboot", .help = "restart", .func = cmd_reboot},
