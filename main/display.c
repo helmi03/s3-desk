@@ -1,9 +1,11 @@
 #include "app.h"
 #include "bsp/esp-bsp.h"
 #include "bsp/touch.h"
+#include "driver/gpio.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_lv_adapter.h"
+#include "esp_timer.h"
 #include "orientation.h"
 
 static const char *TAG = "display";
@@ -13,7 +15,9 @@ static const char *TAG = "display";
  * a 48 KB internal bounce buffer per flush, which fails once Wi-Fi is up. */
 #define BUFFER_LINES 12
 
+static esp_lcd_panel_handle_t panel;
 static esp_lcd_panel_io_handle_t panel_io;
+static esp_lcd_touch_handle_t tp;
 static volatile quarter_t quarter;
 static uint16_t *rot_buf;
 volatile bool display_touch_log; /* one flush in flight at a time, so one rotation buffer is enough */
@@ -91,12 +95,48 @@ void display_set_rotation(quarter_t q)
     ESP_LOGI(TAG, "rotated to %d degrees", q * 90);
 }
 
+#define CST92XX_DEEP_SLEEP 0x05
+
+void display_sleep(bool sleep)
+{
+    if (sleep) {
+        /* Without the pause a flush could hit the sleeping panel; it stays awake and dark instead. */
+        if (esp_lv_adapter_pause(1000) != ESP_OK) {
+            ESP_LOGW(TAG, "LVGL did not pause, panel left awake");
+            return;
+        }
+        esp_lcd_panel_disp_on_off(panel, false);
+        esp_lcd_panel_disp_sleep(panel, true);
+        esp_lcd_panel_io_tx_param(tp->io, 0xD1, (uint8_t[]){CST92XX_DEEP_SLEEP}, 1);
+        return;
+    }
+    gpio_set_level(tp->config.rst_gpio_num, 0);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    gpio_set_level(tp->config.rst_gpio_num, 1);
+    vTaskDelay(pdMS_TO_TICKS(50));
+    /* Leaving deep standby resets the panel and reruns its init, which writes the driver's own MADCTL. */
+    esp_lcd_panel_disp_sleep(panel, false);
+    write_madctl(quarter);
+    esp_lcd_panel_disp_on_off(panel, true);
+    if (display_lock(1000)) {
+        lv_obj_invalidate(lv_screen_active());
+        display_unlock();
+    }
+    esp_lv_adapter_resume();
+}
+
+/* The adapter's tick timer stops while paused, so LVGL time would freeze. */
+static uint32_t tick_ms(void)
+{
+    return (uint32_t)(esp_timer_get_time() / 1000);
+}
+
 void display_start(quarter_t initial)
 {
     esp_lv_adapter_config_t adapter = ESP_LV_ADAPTER_DEFAULT_CONFIG();
     ESP_ERROR_CHECK(esp_lv_adapter_init(&adapter));
+    lv_tick_set_cb(tick_ms);
 
-    esp_lcd_panel_handle_t panel;
     esp_lcd_panel_io_handle_t io;
     const bsp_display_config_t panel_cfg = {.max_transfer_sz = BSP_LCD_H_RES * BUFFER_LINES * 2};
     ESP_ERROR_CHECK(bsp_display_new(&panel_cfg, &panel, &io));
@@ -124,9 +164,11 @@ void display_start(quarter_t initial)
     ESP_ERROR_CHECK(esp_lv_adapter_set_draw_bitmap_callbacks(disp, &cbs, NULL));
 
     bsp_display_cfg_t touch_cfg = {0};
-    esp_lcd_touch_handle_t tp;
     ESP_ERROR_CHECK(bsp_touch_new(&touch_cfg, &tp));
     tp->config.process_coordinates = map_touch;
+    /* CONFIG_PM_SLP_DISABLE_GPIO floats pins in light sleep; a floating reset would wake panel and touch. */
+    gpio_sleep_sel_dis(BSP_LCD_RST);
+    gpio_sleep_sel_dis(tp->config.rst_gpio_num);
     esp_lv_adapter_touch_config_t tcfg = ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(disp, tp);
     esp_lv_adapter_register_touch(&tcfg);
 
