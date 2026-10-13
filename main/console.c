@@ -4,6 +4,7 @@
 
 #include "app.h"
 #include "bsp/esp-bsp.h"
+#include "driver/i2c_master.h"
 #include "esp_console.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -166,6 +167,43 @@ static int cmd_tasks(int argc, char **argv)
     return 0;
 }
 
+static int cmd_i2cscan(int argc, char **argv)
+{
+    for (uint16_t a = 0x08; a < 0x78; a++) {
+        if (i2c_master_probe(bsp_i2c_get_handle(), a, 20) == ESP_OK) {
+            printf("I2C device at 0x%02X\n", a);
+        }
+    }
+    return 0;
+}
+
+static int cmd_i2cget(int argc, char **argv)
+{
+    if (argc != 4) {
+        printf("usage: i2cget ADDR REG COUNT (hex addr/reg)\n");
+        return 1;
+    }
+    i2c_device_config_t cfg = {.device_address = (uint16_t)strtol(argv[1], NULL, 16), .scl_speed_hz = 100000};
+    i2c_master_dev_handle_t d;
+    if (i2c_master_bus_add_device(bsp_i2c_get_handle(), &cfg, &d) != ESP_OK) {
+        return 1;
+    }
+    uint8_t reg = (uint8_t)strtol(argv[2], NULL, 16), buf[32];
+    int n = atoi(argv[3]);
+    n = n < 1 ? 1 : n > 32 ? 32 : n;
+    esp_err_t err = i2c_master_transmit_receive(d, &reg, 1, buf, n, 100);
+    i2c_master_bus_rm_device(d);
+    if (err != ESP_OK) {
+        printf("read failed: %s\n", esp_err_to_name(err));
+        return 1;
+    }
+    for (int i = 0; i < n; i++) {
+        printf("%02X ", buf[i]);
+    }
+    printf("\n");
+    return 0;
+}
+
 static int cmd_pm(int argc, char **argv)
 {
     return esp_pm_dump_locks(stdout) == ESP_OK ? 0 : 1;
@@ -240,6 +278,8 @@ void console_start(void)
         {.command = "view", .help = "view 0|1|2|3|settings", .func = cmd_view},
         {.command = "snap", .help = "dump the screen as base64 RGB565", .func = cmd_snap},
         {.command = "tasks", .help = "list tasks with state and CPU time", .func = cmd_tasks},
+        {.command = "i2cscan", .help = "list devices on the sensor I2C bus", .func = cmd_i2cscan},
+        {.command = "i2cget", .help = "i2cget ADDR REG COUNT: read registers (hex)", .func = cmd_i2cget},
         {.command = "pm", .help = "list power management locks", .func = cmd_pm},
         {.command = "screen", .help = "screen on|off: wake or enter low-power mode", .func = cmd_screen},
         {.command = "reboot", .help = "restart", .func = cmd_reboot},

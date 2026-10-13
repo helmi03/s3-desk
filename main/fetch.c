@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,7 +8,9 @@
 #include "esp_heap_caps.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 
 static const char *TAG = "fetch";
@@ -15,9 +18,34 @@ static const char *TAG = "fetch";
 #define ESOLAT_API "https://www.e-solat.gov.my/index.php?r=esolatApi/TakwimSolat"
 #define MAWAQIT_API "https://mawaqit.net/api/2.0"
 #define BODY_MAX (256 * 1024)
-#define BACKOFF_MAX_S (60 * 60)
+#define REFRESH_EVERY_S (7 * 24 * 3600)
+#define RETRY_S 30
 
 static TaskHandle_t task;
+/* The last successful refresh, shared with the app loop through fetch_due(). */
+static SemaphoreHandle_t done_lock;
+static char done_key[200];
+static int64_t done_at;
+
+static void settings_key(char *out, size_t cap)
+{
+    settings_t s = app_settings();
+    snprintf(out, cap, "%d|%s|%s|%s", s.source, s.zone, s.mawaqit_uuid, s.mawaqit_token);
+}
+
+bool fetch_due(void)
+{
+    wallclock_t now = clock_now();
+    if (!now.valid || !done_lock) {
+        return false;
+    }
+    char key[200];
+    settings_key(key, sizeof(key));
+    xSemaphoreTake(done_lock, portMAX_DELAY);
+    bool due = strcmp(key, done_key) != 0 || esp_timer_get_time() / 1000000 - done_at >= REFRESH_EVERY_S;
+    xSemaphoreGive(done_lock);
+    return due || !tables_has(now.date.year);
+}
 
 typedef struct {
     char *buf;
@@ -134,24 +162,16 @@ static void fetch_task(void *arg)
 {
     body_t body = {.buf = heap_caps_malloc(BODY_MAX, MALLOC_CAP_SPIRAM)};
     year_table_t *t = heap_caps_malloc(sizeof(year_table_t), MALLOC_CAP_SPIRAM);
-    date_t done_for = {0};
-    char done_key[200] = "";
-    int backoff_s = 60;
-
+    assert(body.buf && t);
     for (;;) {
         ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(60 * 1000));
-        wallclock_t now = clock_now();
-        if (!now.valid || net_state() != UI_NET_ONLINE) {
+        if (!fetch_due() || net_state() != UI_NET_ONLINE) {
             continue;
         }
+        wallclock_t now = clock_now();
         settings_t s = app_settings();
         char key[200];
-        snprintf(key, sizeof(key), "%d|%s|%s|%s", s.source, s.zone, s.mawaqit_uuid, s.mawaqit_token);
-        bool settings_changed = strcmp(key, done_key) != 0;
-        bool new_day = date_cmp(done_for, now.date) != 0 && now.second >= 5 * 60;
-        if (!settings_changed && !new_day) {
-            continue;
-        }
+        settings_key(key, sizeof(key));
         bool ok = s.source == SOURCE_MAWAQIT ? refresh_mawaqit(&s, now, &body, t) : refresh_esolat(s.zone, now, &body, t);
         if (!ok && s.source == SOURCE_MAWAQIT) {
             ESP_LOGW(TAG, "Mawaqit failed, using e-solat for %s", s.zone);
@@ -159,13 +179,14 @@ static void fetch_task(void *arg)
         }
         app_set_stale(!ok);
         if (ok) {
-            done_for = now.date;
+            xSemaphoreTake(done_lock, portMAX_DELAY);
+            done_at = esp_timer_get_time() / 1000000;
             snprintf(done_key, sizeof(done_key), "%s", key);
-            backoff_s = 60;
+            xSemaphoreGive(done_lock);
         } else {
-            ESP_LOGW(TAG, "refresh failed, retrying in %d s", backoff_s);
-            vTaskDelay(pdMS_TO_TICKS(backoff_s * 1000));
-            backoff_s = backoff_s * 2 > BACKOFF_MAX_S ? BACKOFF_MAX_S : backoff_s * 2;
+            /* Wi-Fi stays up for a bounded attempt (wifi_policy.h); retry inside it. */
+            ESP_LOGW(TAG, "refresh failed, retrying in %d s", RETRY_S);
+            vTaskDelay(pdMS_TO_TICKS(RETRY_S * 1000));
             xTaskNotifyGive(task);
         }
     }
@@ -180,5 +201,6 @@ void fetch_kick(void)
 
 void fetch_start(void)
 {
+    done_lock = xSemaphoreCreateMutex();
     xTaskCreatePinnedToCore(fetch_task, "fetch", 12288, NULL, 3, &task, 0);
 }

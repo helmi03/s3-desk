@@ -5,6 +5,7 @@
 #include "ms.h"
 #include "orientation.h"
 #include "pomodoro.h"
+#include "wifi_policy.h"
 #include "schedule.h"
 #include "settings.h"
 #include "timetable.h"
@@ -466,6 +467,50 @@ static void test_dates(void)
     TEST_ASSERT_TRUE(date_valid((date_t){2028, 2, 29}));
 }
 
+static void test_wifi_on_at_boot_and_off_once_synced(void)
+{
+    wifi_policy_t p;
+    wifi_policy_init(&p);
+    wifi_inputs_t idle = {0};
+    TEST_ASSERT_TRUE(wifi_policy_want(&p, 0, idle));
+    wifi_policy_synced(&p, 5);
+    TEST_ASSERT_FALSE(wifi_policy_want(&p, 6, idle));
+    TEST_ASSERT_FALSE(wifi_policy_want(&p, 5 + WIFI_SYNC_EVERY_S - 1, idle));
+    TEST_ASSERT_TRUE(wifi_policy_want(&p, 5 + WIFI_SYNC_EVERY_S, idle));
+}
+
+static void test_wifi_stays_on_while_fetch_is_due(void)
+{
+    wifi_policy_t p;
+    wifi_policy_init(&p);
+    wifi_policy_synced(&p, 0);
+    TEST_ASSERT_TRUE(wifi_policy_want(&p, 10, (wifi_inputs_t){.fetch_due = true}));
+    TEST_ASSERT_TRUE(wifi_policy_want(&p, 20, (wifi_inputs_t){.fetch_due = true}));
+    TEST_ASSERT_FALSE(wifi_policy_want(&p, 30, (wifi_inputs_t){0}));
+}
+
+static void test_wifi_gives_up_a_failed_attempt_and_retries_later(void)
+{
+    wifi_policy_t p;
+    wifi_policy_init(&p);
+    wifi_inputs_t idle = {0};
+    TEST_ASSERT_TRUE(wifi_policy_want(&p, 0, idle));
+    TEST_ASSERT_TRUE(wifi_policy_want(&p, WIFI_ATTEMPT_S - 1, idle));
+    TEST_ASSERT_FALSE(wifi_policy_want(&p, WIFI_ATTEMPT_S, idle));
+    TEST_ASSERT_FALSE(wifi_policy_want(&p, WIFI_ATTEMPT_S + WIFI_RETRY_S - 1, idle));
+    TEST_ASSERT_TRUE(wifi_policy_want(&p, WIFI_ATTEMPT_S + WIFI_RETRY_S, idle));
+}
+
+static void test_wifi_holds_on_after_the_user_leaves(void)
+{
+    wifi_policy_t p;
+    wifi_policy_init(&p);
+    wifi_policy_synced(&p, 0);
+    TEST_ASSERT_TRUE(wifi_policy_want(&p, 100, (wifi_inputs_t){.user = true}));
+    TEST_ASSERT_TRUE(wifi_policy_want(&p, 100 + WIFI_USER_HOLD_S - 1, (wifi_inputs_t){0}));
+    TEST_ASSERT_FALSE(wifi_policy_want(&p, 100 + WIFI_USER_HOLD_S, (wifi_inputs_t){0}));
+}
+
 static void test_pomodoro_counts_down_only_while_running(void)
 {
     pomodoro_t p;
@@ -510,6 +555,10 @@ int main(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_dates);
+    RUN_TEST(test_wifi_on_at_boot_and_off_once_synced);
+    RUN_TEST(test_wifi_stays_on_while_fetch_is_due);
+    RUN_TEST(test_wifi_gives_up_a_failed_attempt_and_retries_later);
+    RUN_TEST(test_wifi_holds_on_after_the_user_leaves);
     RUN_TEST(test_pomodoro_counts_down_only_while_running);
     RUN_TEST(test_pomodoro_rolls_into_the_other_phase_and_keeps_running);
     RUN_TEST(test_orientation_classifies_each_side_and_ignores_flat);

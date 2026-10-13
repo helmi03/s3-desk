@@ -97,6 +97,11 @@ void display_set_rotation(quarter_t q)
 
 #define CST92XX_DEEP_SLEEP 0x05
 
+static void panel_cmd(uint8_t cmd)
+{
+    esp_lcd_panel_io_tx_param(panel_io, (0x02 << 24) | (cmd << 8), NULL, 0);
+}
+
 void display_sleep(bool sleep)
 {
     if (sleep) {
@@ -105,24 +110,36 @@ void display_sleep(bool sleep)
             ESP_LOGW(TAG, "LVGL did not pause, panel left awake");
             return;
         }
-        esp_lcd_panel_disp_on_off(panel, false);
-        esp_lcd_panel_disp_sleep(panel, true);
+        /* Plain sleep-in, not the driver's deep standby: leaving that resets the panel and
+         * reruns an init with two 600 ms waits. Sleep-in keeps registers and wakes in ~120 ms. */
+        panel_cmd(0x28);
+        panel_cmd(0x10);
         esp_lcd_panel_io_tx_param(tp->io, 0xD1, (uint8_t[]){CST92XX_DEEP_SLEEP}, 1);
         return;
     }
+    panel_cmd(0x11);
+    /* Before LVGL polls touch again: reads of a sleeping CST9217 fail and the driver's
+     * recovery blocks the LVGL task. The 60 ms also covers the panel's sleep-out settle. */
     gpio_set_level(tp->config.rst_gpio_num, 0);
     vTaskDelay(pdMS_TO_TICKS(10));
     gpio_set_level(tp->config.rst_gpio_num, 1);
     vTaskDelay(pdMS_TO_TICKS(50));
-    /* Leaving deep standby resets the panel and reruns its init, which writes the driver's own MADCTL. */
-    esp_lcd_panel_disp_sleep(panel, false);
-    write_madctl(quarter);
-    esp_lcd_panel_disp_on_off(panel, true);
-    if (display_lock(1000)) {
-        lv_obj_invalidate(lv_screen_active());
-        display_unlock();
-    }
     esp_lv_adapter_resume();
+}
+
+void display_show(void)
+{
+    /* Draw the fresh frame while the panel is still off, so the stale one never shows. */
+    esp_lv_adapter_refresh_now(NULL);
+    panel_cmd(0x29);
+}
+
+static void log_indev_event(lv_event_t *e)
+{
+    lv_event_code_t c = lv_event_get_code(e);
+    if (display_touch_log && c != LV_EVENT_PRESSING) {
+        ESP_LOGI(TAG, "indev %s at %lu", lv_event_code_get_name(c), (unsigned long)lv_tick_get());
+    }
 }
 
 /* The adapter's tick timer stops while paused, so LVGL time would freeze. */
@@ -170,7 +187,10 @@ void display_start(quarter_t initial)
     gpio_sleep_sel_dis(BSP_LCD_RST);
     gpio_sleep_sel_dis(tp->config.rst_gpio_num);
     esp_lv_adapter_touch_config_t tcfg = ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(disp, tp);
-    esp_lv_adapter_register_touch(&tcfg);
+    lv_indev_t *indev = esp_lv_adapter_register_touch(&tcfg);
+    if (indev) {
+        lv_indev_add_event_cb(indev, log_indev_event, LV_EVENT_ALL, NULL);
+    }
 
     ESP_ERROR_CHECK(bsp_display_brightness_init());
     quarter = initial & 3;

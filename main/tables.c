@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <string.h>
 
 #include "app.h"
@@ -19,6 +20,7 @@ void tables_init(void)
     lock = xSemaphoreCreateMutex();
     for (int i = 0; i < SLOTS; i++) {
         slots[i] = heap_caps_calloc(1, sizeof(year_table_t), MALLOC_CAP_SPIRAM);
+        assert(slots[i]);
     }
 }
 

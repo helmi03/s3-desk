@@ -41,3 +41,10 @@ CONFIG_PM_ENABLE=y
 CONFIG_PM_PROFILING=y
 CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
 CONFIG_USJ_NO_AUTO_LS_ON_CONNECTION=y
+# sleep_cpu_configure fails to set up CPU retention on this build, so keep the CPU powered in light sleep.
+# CONFIG_PM_POWER_DOWN_CPU_IN_LIGHT_SLEEP is not set
+# on_event (net.c) runs here; 2304 left 416 bytes free on the board.
+CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096
+# Reboot a stuck board. The app loop sleeps up to 10 s with the screen off, so 30 s.
+CONFIG_ESP_TASK_WDT_PANIC=y
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=30

@@ -29,6 +29,9 @@ static esp_err_t send_json(httpd_req_t *req, cJSON *root)
 {
     char *s = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
+    if (!s) {
+        return httpd_resp_send_500(req);
+    }
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     esp_err_t err = httpd_resp_sendstr(req, s);
@@ -55,6 +58,7 @@ static esp_err_t send_ok(httpd_req_t *req)
  * device is in Wi-Fi setup (its access point is already password protected). */
 static bool authorised(httpd_req_t *req)
 {
+    net_user_activity();
     if (net_state() == UI_NET_SETUP) {
         return true;
     }
@@ -83,6 +87,7 @@ static char *read_body(httpd_req_t *req)
 
 static esp_err_t h_index(httpd_req_t *req)
 {
+    net_user_activity();
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     return httpd_resp_send(req, index_html_start, index_html_end - index_html_start);
 }
@@ -108,6 +113,7 @@ static void add_day(cJSON *arr, const day_times_t *d)
 
 static esp_err_t h_status(httpd_req_t *req)
 {
+    net_user_activity(); /* the open page polls this, which keeps Wi-Fi on for it */
     ui_model_t m;
     app_snapshot(&m);
     cJSON *o = cJSON_CreateObject();

@@ -25,8 +25,12 @@ At each prayer time the azan plays, once per prayer, and you tap the screen to s
 button to open **Tetapan** (settings): azan per prayer, volume, brightness, night dimming, auto-rotate, theme and
 zone.
 
-A short press of the power button turns the screen off, and while it is off, Wi-Fi, touch, sensors and rendering
-sleep, but the azan still plays and the Pomodoro still alerts.
+A short press of the power button turns the screen off. While it is off, touch, the sensors and rendering sleep,
+but the azan still plays and the Pomodoro still alerts.
+
+Wi-Fi is off most of the time. The board keeps time with its RTC chip and connects every 6 hours to
+sync the clock, plus once a week to refresh the prayer times. It also connects while Tetapan is open and for 10
+minutes afterwards.
 
 ## Hardware
 
@@ -48,7 +52,8 @@ tools/check.sh                      # host tests, simulator screenshots, firmwar
 1. On first boot the board opens a Wi-Fi access point and shows a QR code. Scan it with your phone.
 2. Choose your home Wi-Fi.
 3. Open `http://waktusolat.local` to change the zone, upload your own azan MP3, or update the firmware. The PIN
-   for these pages is shown in Tetapan.
+   for these pages is shown in Tetapan. Open Tetapan first so that Wi-Fi is on. The page keeps it on while it
+   stays open.
 
 Prayer times come from [JAKIM e-Solat](https://www.e-solat.gov.my) (default zone SGR03, Klang) and are cached
 for offline use. [Mawaqit](https://mawaqit.net) is optional.

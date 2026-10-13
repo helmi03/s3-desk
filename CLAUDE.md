@@ -43,6 +43,7 @@ Three layers, so most logic runs and is tested on the Mac:
   - settings JSON
   - orientation and touch mapping
   - the Pomodoro state machine
+  - the Wi-Fi schedule
   - the generated zone table
 - **`components/ui/`**: all LVGL code (`ui.c`), shared by the firmware and the simulator.
   - It renders a `ui_model_t` snapshot pushed through `ui_update()`.
@@ -69,11 +70,30 @@ Three layers, so most logic runs and is tested on the Mac:
 - **Orientation mapping:** measured on the board, accel y+ → 3, x− → 2, y− → 1, x+ → 0. A reading must hold for 1 s.
 - **Draw buffers:** they live in internal DMA RAM. PSRAM buffers caused `ESP_ERR_NO_MEM` on flush.
 - **LVGL events:** a swipe still ends in `SHORT_CLICKED`. The gesture handler calls `lv_indev_wait_release()`
-  so one swipe moves exactly one screen. Use LVGL 9.6's dedicated setters and getters (`lv_obj_set_hidden`,
+  so one swipe moves exactly one screen. `lv_obj_clean()` keeps the screen's own event callbacks, so they're
+  registered once in `ui_init()`, never in `build_all()`, which reruns on every theme change. Use LVGL 9.6's dedicated setters and getters (`lv_obj_set_hidden`,
   `lv_obj_is_hidden`); the generic flag API is deprecated.
 - **Low power:** it is active while the screen is off. `main/power.c` switches it, and only the app loop calls
-  it. `lv_tick_set_cb` reads `esp_timer`, so LVGL time keeps running while the adapter is paused. Leaving
-  deep standby resets the panel, which loses MADCTL and brightness, so both are re-sent on wake.
+  it. `lv_tick_set_cb` reads `esp_timer`, so LVGL time keeps running while the adapter is paused.
+  - The panel uses plain sleep-in (0x10), not the driver's deep standby, whose wake reruns an init with
+    1.2 s of delays. On wake the frame is drawn while the panel is still off, then 0x29 turns it on
+    (about 220 ms in total).
+  - The touch chip must be reset before LVGL resumes, because the driver's failed-read recovery blocks the
+    LVGL task.
+  - The BSP enables both I2S channels at init. `audio.c` opens and closes the mic, then the speaker, to
+    release their PM locks.
+  - Light sleep drops the USB serial link, so wake the screen before flashing.
+- **Clock and Wi-Fi:**
+  - Time comes from the PCF85063 RTC at I2C 0x51, which keeps time through resets. It is stored in UTC and
+    written on every SNTP sync.
+  - With the screen off, the system clock is trimmed back to the RTC on wake and every 10 minutes, because light
+    sleep runs it off the RC oscillator.
+  - The station radio follows `wifi_policy.c`, driven by `net_tick()` from the app loop:
+    - It turns on for a sync every 6 hours, for a due fetch (weekly, a missing year, or changed settings), and
+      while Tetapan or the web page is in use, plus 10 minutes after.
+    - A failed attempt gives up after 120 s and waits 30 minutes before the next.
+  - Board I2C addresses: 0x18 ES8311, 0x34 AXP2101, 0x40 ES7210, 0x51 PCF85063, 0x5A CST9217, 0x6B QMI8658,
+    and an unidentified device at 0x56. `i2cscan` and `i2cget` are on the console.
 
 ### Data and assets
 

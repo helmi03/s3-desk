@@ -6,6 +6,8 @@
 #include "esp_app_desc.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
+#include "esp_task_wdt.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -13,6 +15,7 @@
 static const char *TAG = "app";
 
 #define DIM_BRIGHTNESS 30
+#define TRIM_EVERY_US (10LL * 60 * 1000 * 1000)
 
 static SemaphoreHandle_t lock;
 
@@ -295,6 +298,9 @@ static void loop_task(void *arg)
 {
     static ui_model_t m;
     power_mode_t applied = POWER_ACTIVE;
+    bool in_settings = false;
+    int64_t last_trim = 0;
+    esp_task_wdt_add(NULL);
     for (;;) {
         wallclock_t now = clock_now();
         bool reload = false;
@@ -329,13 +335,14 @@ static void loop_task(void *arg)
         st.model = m;
         xSemaphoreGive(lock);
 
+        int64_t wake_started = 0;
         if (want != applied) {
             if (want == POWER_LOW) {
                 show_brightness(0);
+            } else {
+                wake_started = esp_timer_get_time();
             }
             power_set_low(want == POWER_LOW);
-            /* Deep standby lost register 0x51, so the brightness below must be re-sent. */
-            shown_brightness = want == POWER_LOW ? 0 : -1;
             applied = want;
         }
 
@@ -344,19 +351,33 @@ static void loop_task(void *arg)
             display_set_rotation(m.settings.auto_rotate ? hw_orientation() : m.settings.rotation);
             if (display_lock(200)) {
                 ui_update(&m);
+                in_settings = ui_current_mode() == UI_MODE_SETTINGS;
                 display_unlock();
             }
+            if (wake_started) {
+                display_show();
+            }
             show_brightness(brightness);
+            if (wake_started) {
+                ESP_LOGI(TAG, "screen on %lld ms after wake began", (esp_timer_get_time() - wake_started) / 1000);
+                clock_trim_from_rtc();
+            }
         } else {
+            in_settings = false;
             uint32_t pomo_ms = UINT32_MAX;
             if (display_lock(200)) {
                 pomo_ms = ui_pomodoro_poll();
                 display_unlock();
             }
-            net_low_power_tick();
+            if (esp_timer_get_time() - last_trim >= TRIM_EVERY_US) {
+                clock_trim_from_rtc();
+                last_trim = esp_timer_get_time();
+            }
             wait = pdMS_TO_TICKS(pomo_ms < 10000 ? pomo_ms : 10000);
         }
+        net_tick(in_settings, fetch_due());
         mark_app_valid_after(pdMS_TO_TICKS(30000));
+        esp_task_wdt_reset();
         ulTaskNotifyTake(pdTRUE, wait);
     }
 }

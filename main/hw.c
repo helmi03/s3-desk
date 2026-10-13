@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <time.h>
 
 #include "app.h"
 #include "bsp/esp-bsp.h"
@@ -28,8 +29,10 @@ static const char *TAG = "hw";
 #define QMI8658_CTRL3 0x04
 #define QMI8658_CTRL7 0x08
 #define QMI8658_AX_L 0x35
+#define PCF85063_ADDR 0x51
+#define PCF85063_SECONDS 0x04 /* seconds..years follow, BCD; bit 7 of seconds = oscillator stopped */
 
-static i2c_master_dev_handle_t pmu, imu;
+static i2c_master_dev_handle_t pmu, imu, rtc;
 static volatile bool battery_present, battery_charging;
 static volatile uint8_t battery_pct;
 
@@ -209,7 +212,7 @@ static void poll_task(void *arg)
     for (;;) {
         pmu_poll();
         if (low_power) {
-            vTaskDelay(pdMS_TO_TICKS(1000));
+            vTaskDelay(pdMS_TO_TICKS(250));
             continue;
         }
         accel_mg_t a;
@@ -220,10 +223,59 @@ static void poll_task(void *arg)
     }
 }
 
+static uint8_t bcd(uint8_t v)
+{
+    return (uint8_t)(((v >> 4) & 0x0F) * 10 + (v & 0x0F));
+}
+
+static uint8_t to_bcd(int v)
+{
+    return (uint8_t)(((v / 10) << 4) | (v % 10));
+}
+
+/* Days since 1970-01-01 (Howard Hinnant's days_from_civil). */
+static int64_t days_from_civil(int y, int m, int d)
+{
+    y -= m <= 2;
+    int era = (y >= 0 ? y : y - 399) / 400;
+    int yoe = y - era * 400;
+    int doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+    int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return (int64_t)era * 146097 + doe - 719468;
+}
+
+bool hw_rtc_get(time_t *out)
+{
+    uint8_t r[7];
+    if (!rtc || reg_read(rtc, PCF85063_SECONDS, r, sizeof(r)) != ESP_OK || (r[0] & 0x80)) {
+        return false;
+    }
+    int year = 2000 + bcd(r[6]);
+    if (year < 2025) {
+        return false;
+    }
+    int64_t days = days_from_civil(year, bcd(r[5] & 0x1F), bcd(r[3] & 0x3F));
+    *out = (time_t)(days * 86400 + bcd(r[2] & 0x3F) * 3600 + bcd(r[1] & 0x7F) * 60 + bcd(r[0] & 0x7F));
+    return true;
+}
+
+void hw_rtc_set(time_t t)
+{
+    struct tm tm;
+    gmtime_r(&t, &tm);
+    uint8_t buf[8] = {PCF85063_SECONDS,      to_bcd(tm.tm_sec),     to_bcd(tm.tm_min),  to_bcd(tm.tm_hour),
+                      to_bcd(tm.tm_mday),    (uint8_t)tm.tm_wday,   to_bcd(tm.tm_mon + 1), to_bcd(tm.tm_year - 100)};
+    if (rtc) {
+        i2c_master_transmit(rtc, buf, sizeof(buf), 100);
+    }
+}
+
 void hw_init_sensors(void)
 {
     pmu_init();
     imu_init();
+    rtc = add_device(PCF85063_ADDR);
+    ESP_LOGI(TAG, "PCF85063 %s", rtc ? "ready" : "not found");
 }
 
 void hw_start(void)

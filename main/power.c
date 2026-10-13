@@ -23,13 +23,12 @@ void power_set_low(bool low)
     if (low) {
         display_sleep(true);
         hw_set_low_power(true);
-        net_set_low_power(true);
         pm_configure(true);
     } else {
         pm_configure(false);
-        net_set_low_power(false);
         hw_set_low_power(false);
         display_sleep(false);
     }
     ESP_LOGI(TAG, "low power %s", low ? "on" : "off");
 }
+

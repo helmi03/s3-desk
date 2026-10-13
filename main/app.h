@@ -1,4 +1,6 @@
 #pragma once
+#include <time.h>
+
 #include "esp_err.h"
 #include "orientation.h"
 #include "schedule.h"
@@ -36,7 +38,12 @@ void power_set_low(bool low);
 void clock_init(void);
 wallclock_t clock_now(void);
 void clock_set_manual(date_t d, int32_t second_of_day);
-void clock_mark_synced(void);
+/* Time from the PCF85063 RTC, if it holds a valid one. Call after the I2C bus is up. */
+void clock_load_rtc(void);
+/* SNTP set the system time: mark it valid and copy it to the RTC. */
+void clock_sntp_synced(void);
+/* Light sleep runs the system clock off the internal RC oscillator; pull it back to the RTC. */
+void clock_trim_from_rtc(void);
 
 /* storage.c */
 esp_err_t storage_init(void);
@@ -60,6 +67,8 @@ void tables_with(void (*fn)(const timetable_t *tt, void *ctx), void *ctx);
 /* fetch.c: e-solat / Mawaqit download task */
 void fetch_start(void);
 void fetch_kick(void);
+/* The prayer table needs downloading (missing year, changed source, or a week old). */
+bool fetch_due(void);
 
 /* audio.c */
 esp_err_t audio_init(void);
@@ -78,8 +87,10 @@ void net_reset_wifi(void);
 char *net_scan_json(void);
 /* Stops STA Wi-Fi while low, waking it hourly to resync SNTP; SoftAP setup stays up.
  * Both run only on the app loop task. */
-void net_set_low_power(bool low);
-void net_low_power_tick(void);
+/* Runs the Wi-Fi schedule (wifi_policy.h); call from the app loop only. */
+void net_tick(bool user, bool fetch_due);
+/* The web page is in use; keeps Wi-Fi on for the user hold. */
+void net_user_activity(void);
 
 /* web.c */
 void web_start(void);
@@ -97,6 +108,9 @@ bool hw_imu_read(int16_t acc[3], int16_t gyr[3]); /* raw: 8192 LSB/g, 32 LSB/dps
 void hw_set_brightness(int percent);
 /* Low: IMU off and the PMU polled once a second. Leaving re-reads the orientation. */
 void hw_set_low_power(bool low);
+/* PCF85063 real-time clock, kept in UTC. hw_rtc_get is false if it is missing or lost power. */
+bool hw_rtc_get(time_t *out);
+void hw_rtc_set(time_t t);
 
 /* The BSP's bsp_display_lock() returns esp_lv_adapter_lock()'s esp_err_t as a
  * bool, so it reports false when the lock was taken. Use these instead;
@@ -106,6 +120,8 @@ void display_set_rotation(quarter_t q);
 /* Pauses LVGL and puts the panel and touch into deep sleep, or wakes them.
  * Call without holding display_lock: pausing waits for the LVGL task. */
 void display_sleep(bool sleep);
+/* After waking: render the current UI, then turn the panel on. */
+void display_show(void);
 extern volatile bool display_touch_log;
 bool display_lock(int timeout_ms);
 void display_unlock(void);
