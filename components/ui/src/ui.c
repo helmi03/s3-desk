@@ -8,6 +8,12 @@
 
 LV_FONT_DECLARE(font_digits_72);
 LV_FONT_DECLARE(font_digits_120);
+LV_FONT_DECLARE(font_paper_14);
+LV_FONT_DECLARE(font_paper_18);
+LV_FONT_DECLARE(font_paper_22);
+LV_FONT_DECLARE(font_paper_28);
+LV_FONT_DECLARE(font_paper_36);
+LV_FONT_DECLARE(font_paper_48);
 
 #define SCREEN 480
 #define MARGIN 24
@@ -79,6 +85,7 @@ static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *font, uint32_t color)
     lv_obj_t *l = lv_label_create(parent);
     lv_obj_set_style_text_font(l, font, 0);
     lv_obj_set_style_text_color(l, col(color), 0);
+    lv_obj_set_style_text_line_space(l, 4, 0);
     lv_label_set_text(l, "");
     return l;
 }
@@ -120,11 +127,11 @@ ui_mode_t ui_mode_for(const ui_model_t *m, bool settings_open)
 static void build_list(lv_obj_t *p)
 {
     const palette_t *c = pal();
-    ui.list_date = label(p, &lv_font_montserrat_22, c->text);
+    ui.list_date = label(p, &font_paper_22, c->text);
     lv_obj_align(ui.list_date, LV_ALIGN_TOP_MID, 0, 18);
-    ui.list_hijri = label(p, &lv_font_montserrat_18, c->muted);
+    ui.list_hijri = label(p, &font_paper_18, c->muted);
     lv_obj_align(ui.list_hijri, LV_ALIGN_TOP_MID, 0, 46);
-    ui.list_badge = label(p, &lv_font_montserrat_14, c->on_accent);
+    ui.list_badge = label(p, &font_paper_14, c->on_accent);
     lv_obj_set_style_bg_color(ui.list_badge, col(c->accent), 0);
     lv_obj_set_style_bg_opa(ui.list_badge, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(ui.list_badge, 8, 0);
@@ -145,15 +152,15 @@ static void build_list(lv_obj_t *p)
         lv_obj_set_style_bg_color(row, col(c->accent), 0);
         lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
         ui.list_rows[i] = row;
-        ui.list_names[i] = label(row, &lv_font_montserrat_28, c->text);
+        ui.list_names[i] = label(row, &font_paper_28, c->text);
         lv_obj_align(ui.list_names[i], LV_ALIGN_LEFT_MID, 16, 0);
         lv_label_set_text(ui.list_names[i], PRAYERS[LIST_ORDER[i]].name);
-        ui.list_times[i] = label(row, &lv_font_montserrat_28, c->text);
+        ui.list_times[i] = label(row, &font_paper_28, c->text);
         lv_obj_align(ui.list_times[i], LV_ALIGN_RIGHT_MID, -16, 0);
     }
-    ui.list_next = label(p, &lv_font_montserrat_22, c->accent);
+    ui.list_next = label(p, &font_paper_22, c->accent);
     lv_obj_align(ui.list_next, LV_ALIGN_TOP_MID, 0, 82 + P_COUNT * ROW_H + 8);
-    ui.list_footer = label(p, &lv_font_montserrat_14, c->muted);
+    ui.list_footer = label(p, &font_paper_14, c->muted);
     lv_obj_align(ui.list_footer, LV_ALIGN_BOTTOM_MID, 0, -14);
 }
 
@@ -230,7 +237,7 @@ static void build_clock(lv_obj_t *p)
     lv_scale_set_text_src(s, HOURS);
     lv_obj_set_style_bg_opa(s, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(s, 0, 0);
-    lv_obj_set_style_text_font(s, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_font(s, &font_paper_22, 0);
     lv_obj_set_style_text_color(s, col(c->text), 0);
     lv_obj_set_style_length(s, 14, LV_PART_INDICATOR);
     lv_obj_set_style_line_width(s, 3, LV_PART_INDICATOR);
@@ -255,11 +262,11 @@ static void build_clock(lv_obj_t *p)
     lv_obj_set_style_line_width(ui.clock_sec, 2, 0);
     lv_obj_set_style_line_color(ui.clock_sec, col(c->accent), 0);
 
-    ui.clock_digital = label(p, &lv_font_montserrat_36, c->text);
+    ui.clock_digital = label(p, &font_paper_36, c->text);
     lv_obj_align(ui.clock_digital, LV_ALIGN_TOP_MID, 0, 330);
-    ui.clock_date = label(p, &lv_font_montserrat_18, c->muted);
+    ui.clock_date = label(p, &font_paper_18, c->muted);
     lv_obj_align(ui.clock_date, LV_ALIGN_TOP_MID, 0, 378);
-    ui.clock_next = label(p, &lv_font_montserrat_22, c->accent);
+    ui.clock_next = label(p, &font_paper_22, c->accent);
     lv_obj_align(ui.clock_next, LV_ALIGN_TOP_MID, 0, 412);
 }
 
@@ -289,19 +296,19 @@ static void update_clock(const ui_model_t *m)
 static void build_countdown(lv_obj_t *p)
 {
     const palette_t *c = pal();
-    ui.cd_label = label(p, &lv_font_montserrat_22, c->muted);
+    ui.cd_label = label(p, &font_paper_22, c->muted);
     lv_label_set_text(ui.cd_label, "Waktu seterusnya");
     lv_obj_align(ui.cd_label, LV_ALIGN_TOP_MID, 0, 40);
-    ui.cd_name = label(p, &lv_font_montserrat_48, c->accent);
+    ui.cd_name = label(p, &font_paper_48, c->accent);
     lv_obj_align(ui.cd_name, LV_ALIGN_TOP_MID, 0, 80);
     ui.cd_time = label(p, &font_digits_72, c->text);
     lv_obj_align(ui.cd_time, LV_ALIGN_TOP_MID, 0, 140);
     ui.cd_remaining = label(p, &font_digits_72, c->accent);
     lv_obj_align(ui.cd_remaining, LV_ALIGN_TOP_MID, 0, 270);
-    lv_obj_t *lagi = label(p, &lv_font_montserrat_22, c->muted);
+    lv_obj_t *lagi = label(p, &font_paper_22, c->muted);
     lv_label_set_text(lagi, "lagi");
     lv_obj_align(lagi, LV_ALIGN_TOP_MID, 0, 240);
-    ui.cd_footer = label(p, &lv_font_montserrat_14, c->muted);
+    ui.cd_footer = label(p, &font_paper_14, c->muted);
     lv_obj_align(ui.cd_footer, LV_ALIGN_BOTTOM_MID, 0, -14);
 }
 
@@ -339,14 +346,14 @@ static void build_adhan(lv_obj_t *p)
     lv_obj_set_clickable(p, true);
     lv_obj_set_event_bubble(p, false);
     lv_obj_add_event_cb(p, on_adhan_tap, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *t = label(p, &lv_font_montserrat_28, c->muted);
+    lv_obj_t *t = label(p, &font_paper_28, c->muted);
     lv_label_set_text(t, "Azan");
     lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 90);
-    ui.adhan_name = label(p, &lv_font_montserrat_48, c->accent);
+    ui.adhan_name = label(p, &font_paper_48, c->accent);
     lv_obj_align(ui.adhan_name, LV_ALIGN_TOP_MID, 0, 150);
     ui.adhan_time = label(p, &font_digits_72, c->text);
     lv_obj_align(ui.adhan_time, LV_ALIGN_TOP_MID, 0, 220);
-    lv_obj_t *hint = label(p, &lv_font_montserrat_18, c->muted);
+    lv_obj_t *hint = label(p, &font_paper_18, c->muted);
     lv_label_set_text(hint, "Sentuh skrin untuk henti");
     lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -40);
 }
@@ -362,7 +369,7 @@ static void update_adhan(const ui_model_t *m)
 static void build_setup(lv_obj_t *p)
 {
     const palette_t *c = pal();
-    lv_obj_t *t = label(p, &lv_font_montserrat_28, c->text);
+    lv_obj_t *t = label(p, &font_paper_28, c->text);
     lv_label_set_text(t, "Sambung ke Wi-Fi");
     lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 22);
     ui.setup_qr = lv_qrcode_create(p);
@@ -372,8 +379,10 @@ static void build_setup(lv_obj_t *p)
     lv_obj_set_style_border_color(ui.setup_qr, lv_color_white(), 0);
     lv_obj_set_style_border_width(ui.setup_qr, 8, 0);
     lv_obj_align(ui.setup_qr, LV_ALIGN_TOP_MID, 0, 66);
-    ui.setup_text = label(p, &lv_font_montserrat_18, c->text);
+    ui.setup_text = label(p, &font_paper_18, c->text);
+    lv_obj_set_width(ui.setup_text, SCREEN - 2 * MARGIN);
     lv_obj_set_style_text_align(ui.setup_text, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_long_mode(ui.setup_text, LV_LABEL_LONG_WRAP);
     lv_obj_align(ui.setup_text, LV_ALIGN_TOP_MID, 0, 292);
 }
 
@@ -388,7 +397,7 @@ static void update_setup(const ui_model_t *m)
     }
     char buf[256];
     snprintf(buf, sizeof(buf),
-             "Imbas kod ini dengan telefon, atau sambung ke\n%s  (kata laluan %s)\n\nKemudian buka http://192.168.4.1\nuntuk pilih rangkaian Wi-Fi rumah.",
+             "Imbas kod ini dengan telefon, atau sambung ke %s (kata laluan %s).\n\nKemudian buka http://192.168.4.1 untuk pilih rangkaian Wi-Fi rumah.",
              m->ap_ssid, m->ap_pass);
     set_text(ui.setup_text, buf);
 }
@@ -396,7 +405,7 @@ static void update_setup(const ui_model_t *m)
 static void build_message(lv_obj_t *p, lv_obj_t **text, const char *title, bool spinner)
 {
     const palette_t *c = pal();
-    lv_obj_t *t = label(p, &lv_font_montserrat_28, c->text);
+    lv_obj_t *t = label(p, &font_paper_28, c->text);
     lv_label_set_text(t, title);
     lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 150);
     if (spinner) {
@@ -406,7 +415,7 @@ static void build_message(lv_obj_t *p, lv_obj_t **text, const char *title, bool 
         lv_obj_set_style_arc_color(s, col(c->surface), LV_PART_MAIN);
         lv_obj_align(s, LV_ALIGN_TOP_MID, 0, 210);
     }
-    *text = label(p, &lv_font_montserrat_18, c->muted);
+    *text = label(p, &font_paper_18, c->muted);
     lv_obj_set_width(*text, SCREEN - 2 * MARGIN);
     lv_obj_set_style_text_align(*text, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(*text, LV_LABEL_LONG_WRAP);
@@ -481,7 +490,7 @@ static lv_obj_t *settings_row(lv_obj_t *list, const char *text)
     lv_obj_remove_style_all(row);
     lv_obj_set_size(row, LV_PCT(100), 56);
     lv_obj_set_scrollable(row, false);
-    lv_obj_t *l = label(row, &lv_font_montserrat_22, c->text);
+    lv_obj_t *l = label(row, &font_paper_22, c->text);
     lv_label_set_text(l, text);
     lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
     return row;
@@ -496,7 +505,7 @@ static lv_obj_t *settings_button(lv_obj_t *parent, const char *text, lv_event_cb
     lv_obj_set_style_radius(b, 12, 0);
     lv_obj_set_style_shadow_width(b, 0, 0);
     lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, NULL);
-    lv_obj_t *l = label(b, &lv_font_montserrat_22, c->text);
+    lv_obj_t *l = label(b, &font_paper_22, c->text);
     lv_label_set_text(l, text);
     lv_obj_center(l);
     return b;
@@ -524,11 +533,11 @@ static void build_settings(lv_obj_t *p)
     lv_obj_set_scrollable(list, true);
     lv_obj_set_scrollbar_mode(list, LV_SCROLLBAR_MODE_OFF);
 
-    lv_obj_t *title = label(list, &lv_font_montserrat_28, c->accent);
+    lv_obj_t *title = label(list, &font_paper_28, c->accent);
     lv_label_set_text(title, "Tetapan");
     settings_button(list, "Kembali", on_back);
 
-    lv_obj_t *h = label(list, &lv_font_montserrat_18, c->muted);
+    lv_obj_t *h = label(list, &font_paper_18, c->muted);
     lv_label_set_text(h, "Azan");
     for (int p = 0; p < P_COUNT; p++) {
         if (!PRAYERS[p].adhan) {
@@ -543,7 +552,7 @@ static void build_settings(lv_obj_t *p)
         ui.set_switch[p] = sw;
     }
 
-    h = label(list, &lv_font_montserrat_18, c->muted);
+    h = label(list, &font_paper_18, c->muted);
     lv_label_set_text(h, "Kelantangan");
     ui.set_volume = lv_slider_create(list);
     style_control(ui.set_volume);
@@ -552,7 +561,7 @@ static void build_settings(lv_obj_t *p)
     lv_slider_set_range(ui.set_volume, 0, 100);
     lv_obj_add_event_cb(ui.set_volume, settings_changed, LV_EVENT_RELEASED, NULL);
 
-    h = label(list, &lv_font_montserrat_18, c->muted);
+    h = label(list, &font_paper_18, c->muted);
     lv_label_set_text(h, "Kecerahan");
     ui.set_brightness = lv_slider_create(list);
     style_control(ui.set_brightness);
@@ -574,14 +583,14 @@ static void build_settings(lv_obj_t *p)
     lv_obj_align(ui.set_rotate, LV_ALIGN_RIGHT_MID, 0, 0);
     lv_obj_add_event_cb(ui.set_rotate, settings_changed, LV_EVENT_VALUE_CHANGED, NULL);
 
-    h = label(list, &lv_font_montserrat_18, c->muted);
+    h = label(list, &font_paper_18, c->muted);
     lv_label_set_text(h, "Tema");
     ui.set_theme = lv_dropdown_create(list);
     lv_obj_set_width(ui.set_theme, LV_PCT(100));
     lv_dropdown_set_options(ui.set_theme, "Gelap\nHijau\nBiru\nUngu");
     lv_obj_add_event_cb(ui.set_theme, settings_changed, LV_EVENT_VALUE_CHANGED, NULL);
 
-    h = label(list, &lv_font_montserrat_18, c->muted);
+    h = label(list, &font_paper_18, c->muted);
     lv_label_set_text(h, "Zon");
     ui.set_zone = lv_dropdown_create(list);
     lv_obj_set_width(ui.set_zone, LV_PCT(100));
@@ -599,13 +608,14 @@ static void build_settings(lv_obj_t *p)
         lv_obj_t *dd = i ? ui.set_zone : ui.set_theme;
         lv_obj_set_style_bg_color(dd, col(c->surface), 0);
         lv_obj_set_style_text_color(dd, col(c->text), 0);
-        lv_obj_set_style_text_font(dd, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_font(dd, &font_paper_18, 0);
+        lv_obj_set_style_text_font(lv_dropdown_get_list(dd), &font_paper_18, 0);
         lv_obj_set_style_border_width(dd, 0, 0);
     }
 
     settings_button(list, "Uji azan", on_test);
     settings_button(list, "Tetapkan semula Wi-Fi", on_reset_wifi);
-    ui.set_info = label(list, &lv_font_montserrat_14, c->muted);
+    ui.set_info = label(list, &font_paper_14, c->muted);
     lv_obj_set_width(ui.set_info, LV_PCT(100));
     lv_label_set_long_mode(ui.set_info, LV_LABEL_LONG_WRAP);
 }
