@@ -34,6 +34,9 @@ static struct {
     ui_model_t model;
 } st;
 
+/* Set from the LVGL task, which must not take `lock`; the loop applies it. */
+static volatile bool wake_requested;
+
 static void with_lock(void (*fn)(void *), void *ctx)
 {
     xSemaphoreTake(lock, portMAX_DELAY);
@@ -288,6 +291,10 @@ static void loop_task(void *arg)
             st.adhan_playing = false;
             ESP_LOGI(TAG, "ADHAN finished");
         }
+        if (wake_requested) {
+            wake_requested = false;
+            st.screen_off = false;
+        }
         build_model(&m, now);
         check_adhan(&m);
         apply_brightness(&m);
@@ -321,9 +328,7 @@ static void ui_reset_wifi(void)
 
 static void ui_pomodoro_done(void)
 {
-    if (!audio_is_playing()) {
-        audio_play(TONE_FILE);
-    }
+    wake_requested = true;
 }
 
 static const ui_actions_t ACTIONS = {

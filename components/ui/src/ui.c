@@ -59,6 +59,8 @@ static struct {
     pomodoro_t pomo;
     lv_timer_t *pomo_timer;
     lv_obj_t *pomo_phase, *pomo_arc, *pomo_time, *pomo_toggle;
+    lv_obj_t *pomo_alert, *pomo_alert_text;
+    lv_timer_t *pomo_alert_timer;
     /* overlays */
     lv_obj_t *adhan_name, *adhan_time;
     lv_obj_t *setup_qr, *setup_text;
@@ -349,10 +351,83 @@ static void update_pomodoro(void)
     set_text(ui.pomo_toggle, ui.pomo.running ? "Tangguh" : "Mula");
 }
 
+#define POMO_ALERT_MS 30000
+
+static void hide_pomo_alert(void)
+{
+    lv_anim_delete(ui.pomo_alert, NULL);
+    lv_obj_set_hidden(ui.pomo_alert, true);
+    if (ui.pomo_alert_timer) {
+        lv_timer_delete(ui.pomo_alert_timer);
+        ui.pomo_alert_timer = NULL;
+    }
+}
+
+static void on_pomo_alert_timeout(lv_timer_t *t)
+{
+    ui.pomo_alert_timer = NULL; /* one-shot: LVGL deletes it after this call */
+    hide_pomo_alert();
+}
+
+static void on_pomo_alert_tap(lv_event_t *e)
+{
+    hide_pomo_alert();
+    ui_show_view(UI_VIEW_POMODORO);
+}
+
+static void pulse_opa(void *obj, int32_t v)
+{
+    lv_obj_set_style_bg_opa(obj, (lv_opa_t)v, 0);
+}
+
+/* Silent: the whole screen pulses in the accent colour with the new phase. */
+static void show_pomo_alert(void)
+{
+    set_text(ui.pomo_alert_text, ui.pomo.phase == POMO_BREAK ? "Masa rehat" : "Masa fokus");
+    lv_obj_set_hidden(ui.pomo_alert, false);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, ui.pomo_alert);
+    lv_anim_set_exec_cb(&a, pulse_opa);
+    lv_anim_set_values(&a, LV_OPA_COVER, LV_OPA_60);
+    lv_anim_set_duration(&a, 600);
+    lv_anim_set_reverse_duration(&a, 600);
+    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_start(&a);
+    if (ui.pomo_alert_timer) {
+        lv_timer_reset(ui.pomo_alert_timer);
+    } else {
+        ui.pomo_alert_timer = lv_timer_create(on_pomo_alert_timeout, POMO_ALERT_MS, NULL);
+        lv_timer_set_repeat_count(ui.pomo_alert_timer, 1);
+    }
+}
+
+static void build_pomo_alert(void)
+{
+    const palette_t *c = pal();
+    ui.pomo_alert = lv_obj_create(lv_screen_active()); /* built last, so drawn on top */
+    lv_obj_remove_style_all(ui.pomo_alert);
+    lv_obj_set_size(ui.pomo_alert, SCREEN, SCREEN);
+    lv_obj_set_style_bg_color(ui.pomo_alert, col(c->accent), 0);
+    lv_obj_set_style_bg_opa(ui.pomo_alert, LV_OPA_COVER, 0);
+    lv_obj_set_hidden(ui.pomo_alert, true);
+    lv_obj_add_event_cb(ui.pomo_alert, on_pomo_alert_tap, LV_EVENT_CLICKED, NULL);
+    ui.pomo_alert_text = label(ui.pomo_alert, &font_paper_48, c->on_accent);
+    lv_obj_align(ui.pomo_alert_text, LV_ALIGN_CENTER, 0, -20);
+    lv_obj_t *hint = label(ui.pomo_alert, &font_paper_22, c->on_accent);
+    lv_label_set_text(hint, "Sentuh untuk tutup");
+    lv_obj_align(hint, LV_ALIGN_CENTER, 0, 40);
+}
+
 static void on_pomo_timer(lv_timer_t *t)
 {
-    if (pomodoro_tick(&ui.pomo, lv_tick_get()) && ui.actions && ui.actions->pomodoro_done) {
-        ui.actions->pomodoro_done();
+    if (pomodoro_tick(&ui.pomo, lv_tick_get())) {
+        if (ui.mode != UI_MODE_ADHAN) {
+            show_pomo_alert();
+        }
+        if (ui.actions && ui.actions->pomodoro_done) {
+            ui.actions->pomodoro_done();
+        }
     }
     if (ui.mode == UI_MODE_VIEW && ui.view == UI_VIEW_POMODORO) {
         update_pomodoro();
@@ -765,6 +840,10 @@ static void on_screen_event(lv_event_t *e)
     }
     if (code == LV_EVENT_GESTURE) {
         lv_dir_t dir = lv_indev_get_gesture_dir(lv_indev_active());
+        if (dir == LV_DIR_LEFT || dir == LV_DIR_RIGHT) {
+            /* Otherwise the release still sends SHORT_CLICKED and steps again. */
+            lv_indev_wait_release(lv_indev_active());
+        }
         if (dir == LV_DIR_LEFT) {
             ui_step_view(1);
         } else if (dir == LV_DIR_RIGHT) {
@@ -779,6 +858,9 @@ static void build_all(void)
 {
     lv_obj_t *scr = lv_screen_active();
     lv_obj_clean(scr);
+    if (ui.pomo_alert) {
+        hide_pomo_alert(); /* stops its animation and timer; the clean below deletes it */
+    }
     memset(ui.set_switch, 0, sizeof(ui.set_switch));
     lv_obj_set_style_bg_color(scr, col(pal()->bg), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
@@ -806,6 +888,7 @@ static void build_all(void)
     build_message(ui.mode_obj[UI_MODE_WAITING_TIME], &ui.waiting_text, "Menunggu masa", true);
     build_message(ui.mode_obj[UI_MODE_NO_DATA], &ui.nodata_text, "Tiada data waktu solat", true);
     build_settings(ui.mode_obj[UI_MODE_SETTINGS]);
+    build_pomo_alert();
     lv_obj_set_event_bubble(ui.mode_obj[UI_MODE_SETTINGS], false);
     lv_obj_set_clickable(ui.mode_obj[UI_MODE_SETTINGS], true);
     lv_obj_add_event_cb(ui.mode_obj[UI_MODE_SETTINGS], on_screen_event, LV_EVENT_LONG_PRESSED, NULL);
@@ -844,6 +927,9 @@ static void render(void)
             sync_settings_controls(&m->settings);
         }
         show_only(ui.mode_obj, UI_MODE_NO_DATA + 1, mode);
+        if (mode == UI_MODE_ADHAN) {
+            hide_pomo_alert();
+        }
         ui.mode = mode;
     }
     show_only(ui.view_obj, UI_VIEW_COUNT, ui.view);
@@ -924,4 +1010,14 @@ void ui_open_settings(bool open)
 ui_mode_t ui_current_mode(void)
 {
     return ui.mode;
+}
+
+ui_view_t ui_current_view(void)
+{
+    return ui.view;
+}
+
+bool ui_pomodoro_alert_shown(void)
+{
+    return !lv_obj_is_hidden(ui.pomo_alert);
 }

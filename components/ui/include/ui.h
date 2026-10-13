@@ -37,7 +37,7 @@ typedef struct {
     void (*test_adhan)(void);
     void (*apply_settings)(const settings_t *s);
     void (*reset_wifi)(void);
-    void (*pomodoro_done)(void); /* a focus or break phase ran out */
+    void (*pomodoro_done)(void); /* a phase ran out; the screen shows an alert, wake it */
 } ui_actions_t;
 
 typedef enum {
@@ -70,3 +70,6 @@ void ui_show_view(ui_view_t view);
 void ui_step_view(int dir);
 void ui_open_settings(bool open);
 ui_mode_t ui_current_mode(void);
+ui_view_t ui_current_view(void);
+/* True while the end-of-phase Pomodoro alert is on screen. */
+bool ui_pomodoro_alert_shown(void);

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "lvgl.h"
+#include "pomodoro.h"
 #include "ui.h"
 
 #define W 480
@@ -20,21 +21,42 @@ static void finger_read(lv_indev_t *indev, lv_indev_data_t *data)
     data->state = finger_down ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
 }
 
-/* Drags a virtual finger from (x, y0) to (x, y1) in small steps, as a swipe. */
-static void swipe(int x, int y0, int y1)
+static void run_ms(uint32_t ms)
 {
-    finger = (lv_point_t){x, y0};
+    for (uint32_t t = 0; t < ms; t += 16) {
+        lv_tick_inc(16);
+        lv_timer_handler();
+    }
+}
+
+/* Drags a virtual finger from (x0, y0) to (x1, y1) in small steps, as a swipe. */
+static void drag(int x0, int y0, int x1, int y1)
+{
+    finger = (lv_point_t){x0, y0};
     finger_down = true;
     for (int i = 0; i <= 20; i++) {
+        finger.x = x0 + (x1 - x0) * i / 20;
         finger.y = y0 + (y1 - y0) * i / 20;
         lv_tick_inc(16);
         lv_timer_handler();
     }
     finger_down = false;
-    for (int i = 0; i < 60; i++) {
-        lv_tick_inc(16);
-        lv_timer_handler();
-    }
+    run_ms(960);
+}
+
+static void tap(int x, int y)
+{
+    finger = (lv_point_t){x, y};
+    finger_down = true;
+    run_ms(96);
+    finger_down = false;
+    run_ms(96);
+}
+
+static int fail(const char *msg)
+{
+    fprintf(stderr, "FAIL %s\n", msg);
+    return 1;
 }
 
 static int32_t max_scroll_y(lv_obj_t *obj)
@@ -227,7 +249,7 @@ int main(int argc, char **argv)
     ui_update(&m);
     ui_open_settings(true);
     shot(dir, "tetapan");
-    swipe(240, 400, 120);
+    drag(240, 400, 240, 120);
     int32_t scrolled = max_scroll_y(lv_screen_active());
     shot(dir, "tetapan-bawah");
     ui_open_settings(false);
@@ -236,6 +258,37 @@ int main(int argc, char **argv)
         return 1;
     }
     printf("settings scrolls on swipe up (scroll_y %d)\n", (int)scrolled);
+
+    /* One swipe moves exactly one screen, through all four and back. */
+    ui_update(&m);
+    ui_show_view(UI_VIEW_LIST);
+    for (int i = 1; i <= UI_VIEW_COUNT; i++) {
+        drag(400, 240, 80, 240);
+        if (ui_current_view() != (ui_view_t)(i % UI_VIEW_COUNT)) {
+            return fail("swipe left did not move one screen forward");
+        }
+    }
+    drag(80, 240, 400, 240);
+    if (ui_current_view() != (ui_view_t)(UI_VIEW_COUNT - 1)) {
+        return fail("swipe right did not move one screen back");
+    }
+    printf("swipes step one screen at a time\n");
+
+    /* Pomodoro: start, let focus run out, expect the silent alert. */
+    ui_show_view(UI_VIEW_POMODORO);
+    tap(240, 426); /* Mula */
+    run_ms(POMO_FOCUS_S * 1000u + 1000);
+    if (!ui_pomodoro_alert_shown()) {
+        return fail("no alert when focus ran out");
+    }
+    run_ms(300); /* mid-pulse */
+    shot(dir, "pomodoro-tamat");
+    tap(240, 240);
+    if (ui_pomodoro_alert_shown() || ui_current_view() != UI_VIEW_POMODORO) {
+        return fail("tapping the alert did not close it");
+    }
+    shot(dir, "pomodoro-rehat");
+    printf("pomodoro alert shows and closes\n");
 
     if (clipped) {
         fprintf(stderr, "%d clipped or truncated labels\n", clipped);
