@@ -8,6 +8,7 @@
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_netif_sntp.h"
+#include "esp_timer.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -22,10 +23,21 @@ static char ip[16];
 static char ap_ssid[24];
 static char ap_pass[16];
 static TimerHandle_t reconnect_timer;
+static bool sta_configured;
+
+#define RESYNC_EVERY_US (60LL * 60 * 1000 * 1000)
+#define RESYNC_MAX_US (90LL * 1000 * 1000)
+
+/* Written only by the app loop; the event handlers read it. */
+typedef enum { NET_AWAKE, NET_ASLEEP, NET_RESYNC } net_power_t;
+static volatile net_power_t power = NET_AWAKE;
+static volatile bool sntp_stale;    /* Wi-Fi slept since the last SNTP start */
+static volatile bool resync_synced; /* SNTP answered during this resync */
+static int64_t asleep_at, resync_at;
 
 ui_net_t net_state(void)
 {
-    return state;
+    return power == NET_ASLEEP ? UI_NET_OFF : state;
 }
 
 void net_ip(char *out, size_t cap)
@@ -43,11 +55,16 @@ static void on_sntp(struct timeval *tv)
 {
     ESP_LOGI(TAG, "SNTP synced");
     clock_mark_synced();
+    if (power == NET_RESYNC) {
+        resync_synced = true;
+    }
 }
 
 static void reconnect(TimerHandle_t t)
 {
-    esp_wifi_connect();
+    if (power != NET_ASLEEP) {
+        esp_wifi_connect();
+    }
 }
 
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
@@ -55,17 +72,68 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data)
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        ip[0] = '\0';
+        if (power == NET_ASLEEP) {
+            return;
+        }
         if (state != UI_NET_SETUP) {
             state = UI_NET_CONNECTING;
         }
-        ip[0] = '\0';
         xTimerStart(reconnect_timer, 0);
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *e = data;
         snprintf(ip, sizeof(ip), IPSTR, IP2STR(&e->ip_info.ip));
         state = UI_NET_ONLINE;
         ESP_LOGI(TAG, "online, IP %s", ip);
+        if (sntp_stale) {
+            sntp_stale = false;
+            esp_netif_sntp_start();
+        }
         fetch_kick();
+    }
+}
+
+static void wifi_sleep(void)
+{
+    power = NET_ASLEEP;
+    sntp_stale = true;
+    xTimerStop(reconnect_timer, 0);
+    esp_wifi_stop();
+    asleep_at = esp_timer_get_time();
+}
+
+static void wifi_wake(net_power_t to)
+{
+    state = UI_NET_CONNECTING;
+    power = to;
+    esp_wifi_start();
+}
+
+void net_set_low_power(bool low)
+{
+    if (!sta_configured) {
+        return;
+    }
+    if (low && power == NET_AWAKE) {
+        wifi_sleep();
+    } else if (!low && power == NET_ASLEEP) {
+        wifi_wake(NET_AWAKE);
+    } else if (!low) {
+        power = NET_AWAKE;
+    }
+}
+
+void net_low_power_tick(void)
+{
+    int64_t now = esp_timer_get_time();
+    if (power == NET_ASLEEP && now - asleep_at >= RESYNC_EVERY_US) {
+        ESP_LOGI(TAG, "waking Wi-Fi to resync the clock");
+        resync_synced = false;
+        resync_at = now;
+        wifi_wake(NET_RESYNC);
+    } else if (power == NET_RESYNC && (resync_synced || now - resync_at >= RESYNC_MAX_US)) {
+        ESP_LOGI(TAG, "resync %s, Wi-Fi off", resync_synced ? "done" : "timed out");
+        wifi_sleep();
     }
 }
 
@@ -143,6 +211,7 @@ void net_start(void)
     if (esp_wifi_get_config(WIFI_IF_STA, &sta) == ESP_OK && sta.sta.ssid[0]) {
         ESP_LOGI(TAG, "connecting to %s", (char *)sta.sta.ssid);
         state = UI_NET_CONNECTING;
+        sta_configured = true;
         ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
         ESP_ERROR_CHECK(esp_wifi_start());
     } else {
