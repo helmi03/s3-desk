@@ -42,6 +42,24 @@ static esp_err_t mute_fn(AUDIO_PLAYER_MUTE_SETTING setting)
     return ESP_OK;
 }
 
+/* The BSP enables both I2S channels at init and each holds a PM lock that
+ * blocks light sleep. esp_codec_dev only disables a channel on close of a
+ * device it opened, so open and close each direction once. */
+static void release_i2s(void)
+{
+    esp_codec_dev_sample_info_t fs = {.sample_rate = 22050, .channel = 1, .bits_per_sample = 16};
+    /* Microphone first: setting the RX format re-enables TX on the shared duplex clock. */
+    esp_codec_dev_handle_t mic = bsp_audio_codec_microphone_init();
+    if (mic && esp_codec_dev_open(mic, &fs) == ESP_CODEC_DEV_OK) {
+        esp_codec_dev_close(mic);
+    } else {
+        ESP_LOGW(TAG, "microphone codec unavailable, I2S RX stays enabled");
+    }
+    if (esp_codec_dev_open(speaker, &fs) == ESP_CODEC_DEV_OK) {
+        esp_codec_dev_close(speaker);
+    }
+}
+
 esp_err_t audio_init(void)
 {
     speaker = bsp_audio_codec_speaker_init();
@@ -49,6 +67,7 @@ esp_err_t audio_init(void)
         ESP_LOGE(TAG, "speaker codec init failed");
         return ESP_FAIL;
     }
+    release_i2s();
     audio_player_config_t cfg = {
         .mute_fn = mute_fn,
         .clk_set_fn = clk_set_fn,
