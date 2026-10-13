@@ -12,6 +12,7 @@ static esp_codec_dev_handle_t speaker;
 static int volume = 70;
 static volatile int64_t requested_at;
 static volatile bool requested;
+static volatile bool codec_open; /* an open codec keeps I2S enabled, which holds a PM lock */
 
 static esp_err_t write_fn(void *buf, size_t len, size_t *written, uint32_t timeout_ms)
 {
@@ -29,6 +30,7 @@ static esp_err_t clk_set_fn(uint32_t rate, uint32_t bits, i2s_slot_mode_t ch)
     };
     esp_codec_dev_close(speaker);
     int err = esp_codec_dev_open(speaker, &fs);
+    codec_open = err == ESP_CODEC_DEV_OK;
     esp_codec_dev_set_out_vol(speaker, volume);
     ESP_LOGI(TAG, "codec open %lu Hz %lu bit %d ch: %d", (unsigned long)rate, (unsigned long)bits, fs.channel, err);
     return err == ESP_CODEC_DEV_OK ? ESP_OK : ESP_FAIL;
@@ -66,13 +68,15 @@ bool audio_play(const char *path)
         ESP_LOGE(TAG, "missing %s", path);
         return false;
     }
+    /* Set first, so audio_is_playing() does not close the codec the player is opening. */
+    requested_at = esp_timer_get_time();
+    requested = true;
     if (audio_player_play(f) != ESP_OK) {
+        requested = false;
         fclose(f);
         ESP_LOGE(TAG, "play %s failed", path);
         return false;
     }
-    requested = true;
-    requested_at = esp_timer_get_time();
     ESP_LOGI(TAG, "playing %s at volume %d", path, volume);
     return true;
 }
@@ -84,19 +88,22 @@ void audio_stop(void)
     ESP_LOGI(TAG, "stopped");
 }
 
+/* Polled by the app loop, which is also what closes the codec once playback has ended or been stopped. */
 bool audio_is_playing(void)
 {
-    if (!requested) {
-        return false;
+    bool player_playing = audio_player_get_state() == AUDIO_PLAYER_STATE_PLAYING;
+    if (requested) {
+        /* The player starts asynchronously; give it a moment before calling it finished. */
+        if (player_playing || esp_timer_get_time() - requested_at < 1500 * 1000) {
+            return true;
+        }
+        requested = false;
     }
-    if (audio_player_get_state() == AUDIO_PLAYER_STATE_PLAYING) {
-        return true;
+    if (codec_open && !player_playing) {
+        esp_codec_dev_close(speaker);
+        codec_open = false;
+        ESP_LOGI(TAG, "codec closed");
     }
-    /* The player starts asynchronously; give it a moment before calling it finished. */
-    if (esp_timer_get_time() - requested_at < 1500 * 1000) {
-        return true;
-    }
-    requested = false;
     return false;
 }
 
